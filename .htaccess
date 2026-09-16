@@ -1,0 +1,36 @@
+# ==========================================================================
+#  Laravel com document root = raiz do projeto (hospedagem compartilhada)
+#  Coloque este arquivo na MESMA pasta do "artisan" (raiz do projeto).
+#  Sem ele: https://seudominio/ => 403  e  CSS/JS quebrados.
+# ==========================================================================
+
+# Sem listagem de diretórios
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # 1) Bloqueia acesso a arquivos/pastas ocultas (.env, .git, ...)
+    RewriteRule "(^|/)\.(?!well-known)" - [F]
+
+    # 2) Envia TUDO para /public (rotas -> public/index.php, assets -> public/...)
+    #    A marca LR_PUBLIC_REWRITE sobrevive ao redirecionamento interno
+    #    e evita loop infinito de reescrita.
+    RewriteCond %{ENV:LR_PUBLIC_REWRITE} !^1$
+    RewriteCond %{REQUEST_URI} !(^|/)public/
+    RewriteRule ^(.*)$ public/$1 [E=LR_PUBLIC_REWRITE:1,L]
+</IfModule>
+
+# 3) Proteção extra para o caso de o mod_rewrite estar desativado
+<IfModule mod_authz_core.c>
+    <FilesMatch "^\.env.*$|^composer\.(json|lock)$|^package(-lock)?\.json$|^artisan$|\.(sqlite|sql|log|bak|ini|yml|yaml)$">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+
+<IfModule !mod_authz_core.c>
+    <FilesMatch "^\.env.*$|^composer\.(json|lock)$|^package(-lock)?\.json$|^artisan$|\.(sqlite|sql|log|bak|ini|yml|yaml)$">
+        Order allow,deny
+        Deny from all
+    </FilesMatch>
+</IfModule>
