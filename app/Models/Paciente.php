@@ -29,6 +29,7 @@ class Paciente extends Model
         'telefone',
         'celular',
         'email',
+        'observacao',
         'dados',
     ];
 

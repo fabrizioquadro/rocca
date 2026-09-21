@@ -7,7 +7,7 @@
     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
       <div class="d-flex flex-wrap align-items-center gap-3">
         <h4 class="fw-semibold mb-0">Prescrição #{{ $prescricao->id }}</h4>
-        <span class="badge {{ $prescricao->progresso_aplicacao_cor }}">{{ $prescricao->progresso_aplicacao }}</span>
+        <span class="badge {{ $prescricao->situacao_cor }}">{{ $prescricao->situacao }}</span>
         <span class="text-muted">{{ $prescricao->paciente?->nome ?? '—' }}</span>
       </div>
 
@@ -15,16 +15,6 @@
         <a href="{{ route('prescricoes.index') }}" class="btn btn-outline-secondary">
           <i class="ri-arrow-left-line me-1"></i>Voltar
         </a>
-        <form
-          method="POST"
-          action="{{ route('prescricoes.destroy', $prescricao) }}"
-          data-confirmar="Excluir esta prescrição? As semanas, os itens e o financeiro também serão excluídos.">
-          @csrf
-          @method('DELETE')
-          <button type="submit" class="btn btn-outline-danger">
-            <i class="ri-delete-bin-7-line me-1"></i>Excluir
-          </button>
-        </form>
       </div>
     </div>
 
@@ -55,7 +45,7 @@
   </div>
 
   <div class="card" id="abas-prescricao">
-    @php $abaAtiva = in_array(request('aba'), ['resumo', 'semanas', 'financeiro'], true) ? request('aba') : 'resumo'; @endphp
+    @php $abaAtiva = in_array(request('aba'), ['resumo', 'semanas', 'financeiro', 'observacoes', 'logs'], true) ? request('aba') : 'resumo'; @endphp
 
     <div class="card-header p-0 pb-5">
       <div class="nav-align-top">
@@ -94,6 +84,32 @@
               aria-controls="aba-financeiro"
               aria-selected="{{ $abaAtiva === 'financeiro' ? 'true' : 'false' }}">
               <i class="ri-money-dollar-circle-line me-1"></i>Financeiro
+            </button>
+          </li>
+
+          <li class="nav-item">
+            <button
+              type="button"
+              class="nav-link {{ $abaAtiva === 'observacoes' ? 'active' : '' }}"
+              role="tab"
+              data-bs-toggle="tab"
+              data-bs-target="#aba-observacoes"
+              aria-controls="aba-observacoes"
+              aria-selected="{{ $abaAtiva === 'observacoes' ? 'true' : 'false' }}">
+              <i class="ri-chat-1-line me-1"></i>Observações
+            </button>
+          </li>
+
+          <li class="nav-item">
+            <button
+              type="button"
+              class="nav-link {{ $abaAtiva === 'logs' ? 'active' : '' }}"
+              role="tab"
+              data-bs-toggle="tab"
+              data-bs-target="#aba-logs"
+              aria-controls="aba-logs"
+              aria-selected="{{ $abaAtiva === 'logs' ? 'true' : 'false' }}">
+              <i class="ri-history-line me-1"></i>Logs
             </button>
           </li>
         </ul>
@@ -182,7 +198,7 @@
             <div class="col-md-4">
               <div class="border rounded p-4 h-100">
                 <small class="text-muted d-block">Procedimento</small>
-                <span class="badge {{ $prescricao->situacao_procedimento_cor }}">{{ $prescricao->situacao_procedimento }}</span>
+                <span class="badge {{ $prescricao->situacao_cor }}">{{ $prescricao->situacao }}</span>
                 <small class="text-body-secondary d-block">
                   {{ $prescricao->quantidade_semanas }} semana(s) ·
                   {{ $prescricao->semanas_aplicadas }} de {{ $prescricao->semanas_com_aplicacao }} aplicadas
@@ -285,6 +301,19 @@
                             <a class="dropdown-item" href="{{ route('prescricoes.semanas.show', [$prescricao, $semana]) }}">
                               <i class="ri-arrow-right-circle-line me-2"></i>Acessar
                             </a>
+
+                            {{-- Paciente não compareceu: a semana volta para o agendamento --}}
+                            @if ($semana->pode_voltar_para_agendada)
+                              <form
+                                method="POST"
+                                action="{{ route('prescricoes.semanas.devolver', [$prescricao, $semana]) }}"
+                                data-confirmar="Devolver a semana {{ $semana->numero }} para Agendada? A liberação sem pagamento será desfeita.">
+                                @csrf
+                                <button type="submit" class="dropdown-item text-warning">
+                                  <i class="ri-arrow-go-back-line me-2"></i>Devolver para Agendada
+                                </button>
+                              </form>
+                            @endif
 
                             @if ($semana->pode_ser_alterada)
                               <a class="dropdown-item" href="{{ route('prescricoes.semanas.edit', [$prescricao, $semana]) }}">
@@ -703,6 +732,112 @@
           @endif
         @endif
       @endif
+        </div>
+
+        {{-- Observações: cada registro guarda o texto, o autor e a data/hora --}}
+        <div class="tab-pane fade {{ $abaAtiva === 'observacoes' ? 'show active' : '' }}" id="aba-observacoes" role="tabpanel">
+          <form method="POST" action="{{ route('prescricoes.observacoes.store', $prescricao) }}" class="mb-5">
+            @csrf
+
+            <label class="form-label" for="nova_observacao">Nova observação</label>
+            <textarea
+              id="nova_observacao"
+              name="observacao"
+              class="form-control @error('observacao') is-invalid @enderror"
+              rows="3"
+              maxlength="2000"
+              placeholder="Escreva a observação sobre esta prescrição">{{ old('observacao') }}</textarea>
+            @error('observacao')
+              <div class="invalid-feedback">{{ $message }}</div>
+            @enderror
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+              <small class="text-muted">
+                A observação fica registrada com o seu usuário e a data/hora do lançamento.
+              </small>
+
+              <button type="submit" class="btn btn-primary">
+                <i class="ri-add-line me-1"></i>Registrar observação
+              </button>
+            </div>
+          </form>
+
+          <h6 class="fw-semibold mb-3">Histórico</h6>
+
+          @forelse ($prescricao->observacoesRegistradas as $observacao)
+            <div class="border rounded p-3 mb-2">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <span class="fw-semibold">
+                  <i class="ri-user-3-line me-1"></i>{{ $observacao->user?->nome ?? 'usuário removido' }}
+                </span>
+
+                <small class="text-muted">
+                  <i class="ri-time-line me-1"></i>{{ $observacao->criada_em_formatada }}
+                </small>
+              </div>
+
+              <div class="mt-1" style="white-space: pre-line;">{{ $observacao->observacao }}</div>
+            </div>
+          @empty
+            <p class="text-muted mb-0">Nenhuma observação registrada nesta prescrição.</p>
+          @endforelse
+        </div>
+
+        {{-- Logs: tudo o que aconteceu na prescrição, do mais recente para o mais antigo --}}
+        <div class="tab-pane fade {{ $abaAtiva === 'logs' ? 'show active' : '' }}" id="aba-logs" role="tabpanel">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h6 class="fw-semibold mb-0">Histórico da prescrição</h6>
+            <span class="text-muted small">Total: {{ $prescricao->logs->count() }} registro(s)</span>
+          </div>
+
+          @forelse ($prescricao->logs as $log)
+            <div class="border rounded p-3 mb-2">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                  <span class="badge {{ $log->acao->corBadge() }}">
+                    <i class="{{ $log->acao->icone() }} me-1"></i>{{ $log->acao->label() }}
+                  </span>
+
+                  @if ($log->semana)
+                    <span class="badge bg-label-dark">Semana {{ $log->semana->numero }}</span>
+                  @endif
+
+                  <span>{{ $log->descricao }}</span>
+                </div>
+
+                <small class="text-muted">
+                  <i class="ri-user-3-line me-1"></i>{{ $log->user?->nome ?? 'usuário removido' }}
+                  · <i class="ri-time-line me-1"></i>{{ $log->criado_em_formatado }}
+                </small>
+              </div>
+
+              @if ($log->alteracoes)
+                <ul class="list-unstyled small mb-0 mt-2 ps-1">
+                  @foreach ($log->alteracoes as $alteracao)
+                    <li>
+                      <span class="fw-semibold">{{ $alteracao['campo'] }}:</span>
+                      <span class="text-danger text-decoration-line-through">{{ $alteracao['de'] }}</span>
+                      <i class="ri-arrow-right-line mx-1"></i>
+                      <span class="text-success fw-semibold">{{ $alteracao['para'] }}</span>
+                    </li>
+                  @endforeach
+                </ul>
+              @endif
+
+              @if ($log->detalhes)
+                <ul class="list-unstyled small text-body-secondary mb-0 mt-2 ps-1">
+                  @foreach ($log->detalhes as $rotulo => $valor)
+                    <li>
+                      <span class="fw-semibold">{{ $rotulo }}:</span>
+                      <span style="white-space: pre-line;">{{ $valor }}</span>
+                    </li>
+                  @endforeach
+                </ul>
+              @endif
+            </div>
+          @empty
+            <p class="text-muted mb-0">Nenhum registro no histórico desta prescrição.</p>
+          @endforelse
         </div>
       </div>
     </div>

@@ -27,7 +27,15 @@
       <div class="d-flex flex-wrap gap-2">
         {{-- Aplicação da semana: exige parcela paga ou liberação de administrador --}}
         @if ($agendada)
-          @if ($parcela?->esta_paga)
+          {{-- Aplicação sequencial: semana anterior pendente bloqueia o envio --}}
+          @if (! $semana->pode_ir_para_fila)
+            {{-- O title fica no span: botão disabled não dispara hover em alguns navegadores --}}
+            <span class="d-inline-block" title="{{ $semana->motivo_bloqueio_fila }}">
+              <button type="button" class="btn btn-info" disabled>
+                <i class="ri-lock-line me-1"></i>Enviar para Fila de Atendimento
+              </button>
+            </span>
+          @elseif ($parcela?->esta_paga)
             <form
               method="POST"
               action="{{ route('prescricoes.semanas.fila', [$prescricao, $semana]) }}"
@@ -48,6 +56,47 @@
               <i class="ri-play-list-add-line me-1"></i>Enviar para Fila de Atendimento
             </button>
           @endif
+        @endif
+
+        {{-- Aplicação: quem iniciou o atendimento na Enfermagem é quem conduz --}}
+        @if ($semana->atendimentoAberto)
+          @if ($semana->atendimentoAberto->podeSerConduzidoPor(auth()->user()))
+            <a href="{{ route('prescricoes.semanas.aplicar.form', [$prescricao, $semana]) }}" class="btn btn-primary">
+              <i class="ri-syringe-line me-1"></i>Registrar aplicação
+            </a>
+          @else
+            <button
+              type="button"
+              class="btn btn-primary"
+              disabled
+              title="{{ $semana->atendimentoAberto->bloqueio_de_outro_usuario }}">
+              <i class="ri-lock-line me-1"></i>Registrar aplicação
+            </button>
+          @endif
+        @elseif ($semana->pode_iniciar_atendimento)
+          {{-- Iniciar atendimento cai direto na tela de registro da aplicação --}}
+          <form
+            method="POST"
+            action="{{ route('prescricoes.semanas.atendimento.iniciar', [$prescricao, $semana]) }}"
+            data-confirmar="Iniciar o atendimento da semana {{ $semana->numero }}? Você fica como responsável pela aplicação.">
+            @csrf
+            <button type="submit" class="btn btn-primary">
+              <i class="ri-nurse-line me-1"></i>Iniciar atendimento
+            </button>
+          </form>
+        @endif
+
+        {{-- Paciente não compareceu: a semana volta para o agendamento --}}
+        @if ($semana->pode_voltar_para_agendada)
+          <form
+            method="POST"
+            action="{{ route('prescricoes.semanas.devolver', [$prescricao, $semana]) }}"
+            data-confirmar="Devolver a semana {{ $semana->numero }} para Agendada? A liberação sem pagamento será desfeita e uma nova será exigida para voltar à fila.">
+            @csrf
+            <button type="submit" class="btn btn-outline-warning">
+              <i class="ri-arrow-go-back-line me-1"></i>Devolver para Agendada
+            </button>
+          </form>
         @endif
 
         <a href="{{ route('prescricoes.show', $prescricao) }}" class="btn btn-outline-secondary">
@@ -106,7 +155,7 @@
     @endif
 
     {{-- Sem parcela paga: liberação com email e senha de um administrador --}}
-    @if ($agendada && ! $parcela?->esta_paga)
+    @if ($agendada && $semana->pode_ir_para_fila && ! $parcela?->esta_paga)
       <div class="collapse {{ $errors->has('liberacao') || $errors->has('liberacao_email') ? 'show' : '' }}" id="painel-fila">
         <div class="card-body pt-0">
           <div class="border rounded p-4">
@@ -254,6 +303,40 @@
             @endif
           </div>
         </div>
+
+        {{-- Chegada do paciente e atendimentos (a aplicação parcial gera mais de um) --}}
+        @if ($semana->chegada_em || $semana->atendimentos->isNotEmpty())
+          <div class="col-12">
+            <div class="border rounded p-4">
+              <small class="text-muted d-block mb-2">Chegada e atendimento</small>
+
+              @if ($semana->chegada_em)
+                <div>
+                  <i class="ri-login-circle-line me-1"></i>
+                  Chegou em <strong>{{ $semana->chegada_em_formatada }}</strong>
+
+                  @if ($semana->tempo_de_espera)
+                    <span class="badge bg-label-info ms-1">esperando {{ $semana->tempo_de_espera }}</span>
+                  @endif
+                </div>
+              @endif
+
+              @foreach ($semana->atendimentos as $atendimento)
+                <div>
+                  <i class="ri-heart-pulse-line me-1"></i>
+                  {{ $atendimento->em_andamento ? 'Atendimento em andamento' : 'Atendimento' }}:
+                  <strong>{{ $atendimento->iniciado_em_formatado }}</strong>
+                  @if ($atendimento->finalizado_em)
+                    → {{ $atendimento->finalizado_em_formatado }}
+                  @endif
+                  @if ($atendimento->iniciadoPor)
+                    <span class="text-body-secondary">· {{ $atendimento->iniciadoPor->nome }}</span>
+                  @endif
+                </div>
+              @endforeach
+            </div>
+          </div>
+        @endif
 
         @if ($semana->observacao)
           <div class="col-12">

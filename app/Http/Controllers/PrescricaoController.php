@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Enums\FormaPagamento;
 use App\Enums\TipoAtendimento;
+use App\Enums\TipoLogPrescricao;
 use App\Models\Clinica;
 use App\Models\Combo;
 use App\Models\Medicamento;
 use App\Models\Paciente;
 use App\Models\Prescricao;
 use App\Models\PrescricaoAnexo;
+use App\Models\PrescricaoLog;
 use App\Services\FeegowService;
 use App\Services\PrescricaoSemanaService;
 use Illuminate\Http\Request;
@@ -123,6 +125,23 @@ class PrescricaoController extends Controller
             ]);
             $this->salvarAnexos($prescricao, $request->file('anexos', []));
 
+            // Histórico: o cadastro e as semanas que nasceram com ele
+            $prescricao->load(['semanas.itens', 'anexos', 'financeiro']);
+
+            PrescricaoLog::registrar($prescricao, TipoLogPrescricao::Criacao, 'Prescrição cadastrada.', [
+                'detalhes' => $this->detalhesDaPrescricao($prescricao),
+            ]);
+
+            foreach ($prescricao->semanas as $semana) {
+                PrescricaoLog::registrar(
+                    $prescricao,
+                    TipoLogPrescricao::SemanaCriada,
+                    'Semana '.$semana->numero.' criada.',
+                    ['detalhes' => $semana->resumoParaLog()],
+                    $semana->id
+                );
+            }
+
             return $prescricao;
         });
 
@@ -141,6 +160,8 @@ class PrescricaoController extends Controller
             'clinica',
             'user',
             'anexos.user',
+            'observacoesRegistradas.user',
+            'logs.user',
             'semanas.itens.medicamento',
             'semanas.itens.combo',
             'semanas.parcelas',
@@ -173,11 +194,46 @@ class PrescricaoController extends Controller
             ]
         );
 
-        $this->salvarAnexos($prescricao, $request->file('anexos', []));
+        foreach ($this->salvarAnexos($prescricao, $request->file('anexos', [])) as $anexo) {
+            PrescricaoLog::registrar($prescricao, TipoLogPrescricao::AnexoEnviado, 'Anexo enviado: '.$anexo->nome.'.', [
+                'detalhes' => [
+                    'Arquivo' => $anexo->nome,
+                    'Tamanho' => $anexo->tamanho_formatado,
+                    'Tipo' => $anexo->mime,
+                ],
+            ]);
+        }
 
         return redirect()
             ->route('prescricoes.show', $prescricao)
             ->with('success', 'Anexo(s) enviado(s) com sucesso.');
+    }
+
+    /**
+     * Registra uma observação na prescrição. Fica gravado quem escreveu e
+     * quando (a tela volta com a aba de observações aberta).
+     */
+    public function storeObservacao(Request $request, Prescricao $prescricao)
+    {
+        $dados = $request->validate([
+            'observacao' => ['required', 'string', 'max:2000'],
+        ], [
+            'observacao.required' => 'Escreva a observação antes de registrar.',
+            'observacao.max' => 'A observação deve ter no máximo 2000 caracteres.',
+        ]);
+
+        $prescricao->observacoesRegistradas()->create([
+            'user_id' => auth()->id(),
+            'observacao' => $dados['observacao'],
+        ]);
+
+        PrescricaoLog::registrar($prescricao, TipoLogPrescricao::Observacao, 'Observação registrada.', [
+            'detalhes' => ['Observação' => $dados['observacao']],
+        ]);
+
+        return redirect()
+            ->route('prescricoes.show', ['prescricao' => $prescricao, 'aba' => 'observacoes'])
+            ->with('success', 'Observação registrada.');
     }
 
     /**
@@ -186,6 +242,10 @@ class PrescricaoController extends Controller
     public function destroyAnexo(Prescricao $prescricao, PrescricaoAnexo $anexo)
     {
         abort_if($anexo->prescricao_id !== $prescricao->id, 404);
+
+        PrescricaoLog::registrar($prescricao, TipoLogPrescricao::AnexoRemovido, 'Anexo removido: '.$anexo->nome.'.', [
+            'detalhes' => ['Arquivo' => $anexo->nome, 'Tamanho' => $anexo->tamanho_formatado],
+        ]);
 
         if ($anexo->arquivo && file_exists(public_path($anexo->arquivo))) {
             @unlink(public_path($anexo->arquivo));
@@ -204,6 +264,12 @@ class PrescricaoController extends Controller
     public function destroy(Prescricao $prescricao)
     {
         DB::transaction(function () use ($prescricao) {
+            $prescricao->load(['semanas.itens', 'anexos', 'financeiro']);
+
+            PrescricaoLog::registrar($prescricao, TipoLogPrescricao::Exclusao, 'Prescrição excluída.', [
+                'detalhes' => $this->detalhesDaPrescricao($prescricao),
+            ]);
+
             $prescricao->financeiro?->delete();
             $prescricao->delete();
         });
@@ -243,6 +309,9 @@ class PrescricaoController extends Controller
                     ? $paciente->nome.' - '.$paciente->cpf_formatado
                     : $paciente->nome,
                 'nome' => $paciente->nome,
+                // Vai para a tela: a observação precisa aparecer quando o
+                // paciente é escolhido na prescrição.
+                'observacao' => $paciente->observacao,
             ])
             ->values();
 
@@ -323,17 +392,51 @@ class PrescricaoController extends Controller
     }
 
     /**
+     * Resumo da prescrição (chave => valor) usado no histórico.
+     *
+     * @return array<string, string>
+     */
+    private function detalhesDaPrescricao(Prescricao $prescricao): array
+    {
+        $financeiro = $prescricao->financeiro;
+
+        $detalhes = [
+            'Paciente' => $prescricao->paciente?->nome ?? '—',
+            'Clínica' => $prescricao->clinica?->nome ?? '—',
+            'Médico' => $prescricao->medico_nome ?? '—',
+            'Tipo de atendimento' => $prescricao->tipo_atendimento?->label() ?? '—',
+            'Agendamento' => $prescricao->agendamento ?? '—',
+            'Semanas' => (string) $prescricao->semanas->count(),
+            'Valor bruto' => $financeiro?->valor_bruto_formatado ?? $prescricao->valor_total_formatado,
+            'Desconto' => $financeiro && (float) $financeiro->valor_desconto > 0
+                ? $financeiro->desconto_descricao.' ('.$financeiro->valor_desconto_formatado.')'
+                : null,
+            'Adicional' => $financeiro && (float) $financeiro->adicional_valor > 0
+                ? $financeiro->valor_adicional_formatado
+                : null,
+            'Total' => $financeiro?->valor_total_formatado ?? $prescricao->valor_total_formatado,
+            'Anexos' => $prescricao->anexos->isNotEmpty()
+                ? $prescricao->anexos->pluck('nome')->implode(' · ')
+                : null,
+        ];
+
+        return array_filter($detalhes, fn ($valor) => filled($valor) && $valor !== '—');
+    }
+
+    /**
      * Salva os anexos enviados (arquivos ficam em public/uploads/prescricoes).
      *
      * @param  array<int, \Illuminate\Http\UploadedFile>  $arquivos
+     * @return array<int, PrescricaoAnexo>
      */
-    private function salvarAnexos(Prescricao $prescricao, array $arquivos): void
+    private function salvarAnexos(Prescricao $prescricao, array $arquivos): array
     {
         if (empty($arquivos)) {
-            return;
+            return [];
         }
 
         $destino = public_path('uploads/prescricoes');
+        $criados = [];
 
         File::ensureDirectoryExists($destino);
 
@@ -353,7 +456,7 @@ class PrescricaoController extends Controller
 
             $arquivo->move($destino, $nomeArquivo);
 
-            $prescricao->anexos()->create([
+            $criados[] = $prescricao->anexos()->create([
                 'nome' => $nomeOriginal,
                 'arquivo' => 'uploads/prescricoes/'.$nomeArquivo,
                 'mime' => $mime,
@@ -361,5 +464,7 @@ class PrescricaoController extends Controller
                 'user_id' => auth()->id(),
             ]);
         }
+
+        return $criados;
     }
 }

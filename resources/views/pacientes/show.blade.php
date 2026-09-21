@@ -126,6 +126,31 @@
             </div>
           </div>
 
+          {{-- Observação interna do paciente (não vem da Feegow) --}}
+          <form method="POST" action="{{ route('pacientes.observacao.update', $paciente) }}" class="mt-6">
+            @csrf
+            @method('PUT')
+
+            <h6 class="fw-semibold mb-3">Observação</h6>
+
+            <textarea
+              id="observacao"
+              name="observacao"
+              class="form-control @error('observacao') is-invalid @enderror"
+              rows="4"
+              maxlength="2000"
+              placeholder="Anotações internas sobre o paciente">{{ old('observacao', $paciente->observacao) }}</textarea>
+            @error('observacao')
+              <div class="invalid-feedback">{{ $message }}</div>
+            @enderror
+
+            <div class="d-flex justify-content-end mt-3">
+              <button type="submit" class="btn btn-primary">
+                <i class="ri-save-line me-1"></i>Salvar observação
+              </button>
+            </div>
+          </form>
+
           <h6 class="fw-semibold mt-6 mb-3">Dados recebidos da Feegow</h6>
 
           <div class="accordion" id="accordion-json">

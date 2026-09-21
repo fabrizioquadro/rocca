@@ -75,6 +75,39 @@
       }
     }
 
+    // Observacao do paciente: e um aviso importante, entao aparece assim que
+    // o paciente e escolhido (vem da busca de pacientes e do select2).
+    const pacienteSelect = document.getElementById('paciente_id');
+    const avisoObservacao = document.getElementById('aviso-observacao-paciente');
+    const avisoObservacaoTexto = document.getElementById('aviso-observacao-paciente-texto');
+
+    if (pacienteSelect && avisoObservacao && avisoObservacaoTexto) {
+      const observacaoDoPaciente = () => {
+        // O select2 guarda o registro completo (com a observacao) no item escolhido
+        if (window.jQuery && jQuery.fn.select2 && jQuery(pacienteSelect).data('select2')) {
+          const escolhidos = jQuery(pacienteSelect).select2('data');
+
+          if (escolhidos && escolhidos.length && escolhidos[0].observacao) {
+            return escolhidos[0].observacao;
+          }
+        }
+
+        const opcao = pacienteSelect.options[pacienteSelect.selectedIndex];
+
+        return opcao ? (opcao.getAttribute('data-observacao') || '') : '';
+      };
+
+      const atualizarObservacaoPaciente = () => {
+        const texto = observacaoDoPaciente();
+
+        avisoObservacaoTexto.textContent = texto;
+        avisoObservacao.classList.toggle('d-none', !texto);
+      };
+
+      pacienteSelect.addEventListener('change', atualizarObservacaoPaciente);
+      atualizarObservacaoPaciente();
+    }
+
     const container = document.getElementById('semanas');
     const modeloSemana = document.getElementById('modelo-semana');
     const botaoAdicionarSemana = document.getElementById('adicionar-semana');

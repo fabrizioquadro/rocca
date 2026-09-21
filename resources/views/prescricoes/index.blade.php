@@ -35,7 +35,8 @@
               <th>Clínica</th>
               <th>Tipo de atendimento</th>
               <th>Agendamento</th>
-              <th>Semanas</th>
+              <th class="text-center">Semanas</th>
+              <th>Situação</th>
               <th class="text-end">Valor total</th>
               <th class="text-end">Desconto</th>
               <th class="text-end">Adicional</th>
@@ -69,16 +70,6 @@
                       <a class="dropdown-item" href="{{ route('prescricoes.show', $prescricao) }}">
                         <i class="ri-arrow-right-circle-line me-2"></i>Acessar
                       </a>
-                      <form
-                        method="POST"
-                        action="{{ route('prescricoes.destroy', $prescricao) }}"
-                        data-confirmar="Excluir esta prescrição? As semanas, os itens e o financeiro também serão excluídos.">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="dropdown-item text-danger">
-                          <i class="ri-delete-bin-7-line me-2"></i>Excluir
-                        </button>
-                      </form>
                     </div>
                   </div>
                 </td>
@@ -103,13 +94,22 @@
                 <td>{{ $prescricao->clinica?->nome ?? '—' }}</td>
                 <td>{{ $prescricao->tipo_atendimento?->label() ?? '—' }}</td>
                 <td>{{ $prescricao->agendamento ?? '—' }}</td>
-                <td>
-                  <span class="badge {{ $prescricao->progresso_aplicacao_cor }}">
-                    {{ $prescricao->progresso_aplicacao }}
-                  </span>
-                  <span class="text-body-secondary small d-block">
-                    {{ $prescricao->quantidade_semanas }} no total
-                  </span>
+                {{-- Progresso: número da última semana aplicada / total de semanas da prescrição --}}
+                <td class="text-center" data-order="{{ $prescricao->ultima_semana_aplicada ?? 0 }}">
+                  @if ($prescricao->semanas_com_aplicacao === 0)
+                    <span class="text-muted">—</span>
+                  @else
+                    @if ($prescricao->ultima_semana_aplicada === null)
+                      <div class="text-body-secondary small">Não iniciada</div>
+                    @endif
+                    <span class="fw-semibold">
+                      {{ $prescricao->ultima_semana_aplicada ?? 0 }}/{{ $prescricao->quantidade_semanas }}
+                    </span>
+                  @endif
+                </td>
+                {{-- Situação derivada das semanas: nada é gravado na prescrição --}}
+                <td data-order="{{ $prescricao->situacao_ordem }}">
+                  <span class="badge {{ $prescricao->situacao_cor }}">{{ $prescricao->situacao }}</span>
                 </td>
                 <td class="text-end fw-semibold" data-order="{{ $financeiro?->valor_total ?? $prescricao->valor_total }}">
                   {{ $financeiro?->valor_total_formatado ?? $prescricao->valor_total_formatado }}

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Paciente;
 use App\Services\FeegowService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 class PacienteController extends Controller
@@ -94,8 +95,27 @@ class PacienteController extends Controller
     }
 
     /**
+     * Grava a observação interna do paciente (a Feegow não manda este dado).
+     */
+    public function atualizarObservacao(Request $request, Paciente $paciente)
+    {
+        $dados = $request->validate([
+            'observacao' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'observacao.max' => 'A observação deve ter no máximo 2000 caracteres.',
+        ]);
+
+        $paciente->update(['observacao' => $dados['observacao'] ?? null]);
+
+        return back()->with('success', 'Observação do paciente atualizada.');
+    }
+
+    /**
      * Converte o JSON da Feegow nos campos do paciente.
      * Mantém o que já existe quando a Feegow não traz o dado.
+     *
+     * A observação é campo interno: fica FORA deste mapeamento de propósito,
+     * para a sincronização nunca apagar o que foi digitado na tela.
      */
     private function mapear(array $dados, ?Paciente $atual = null): array
     {

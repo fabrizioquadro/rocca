@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\ClinicaController;
 use App\Http\Controllers\ComboController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EstoqueBaixaController;
 use App\Http\Controllers\EstoqueBuscaController;
 use App\Http\Controllers\EstoqueEntradaController;
@@ -42,10 +43,8 @@ Route::get('/', function () {
     return view('auth.login');
 });
 
-// Área logada (placeholder até criarmos o dashboard)
-Route::get('/home', function () {
-    return view('home');
-})->middleware('auth')->name('home');
+// Área logada (dashboard com as áreas operacionais)
+Route::get('/home', [DashboardController::class, 'index'])->middleware('auth')->name('home');
 
 // Autenticação
 Route::middleware('guest')->group(function () {
@@ -163,6 +162,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/pacientes/{paciente}', [PacienteController::class, 'show'])->name('pacientes.show');
     Route::post('/pacientes/{paciente}/atualizar', [PacienteController::class, 'atualizarDados'])->name('pacientes.atualizar');
 
+    // Observação interna do paciente (não vem da Feegow)
+    Route::put('/pacientes/{paciente}/observacao', [PacienteController::class, 'atualizarObservacao'])->name('pacientes.observacao.update');
+
     // Prescrições
     Route::get('/prescricoes', [PrescricaoController::class, 'index'])->name('prescricoes.index');
     Route::get('/prescricoes/criar', [PrescricaoController::class, 'create'])->name('prescricoes.create');
@@ -175,6 +177,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/prescricoes/{prescricao}/anexos', [PrescricaoController::class, 'storeAnexo'])->name('prescricoes.anexos.store');
     Route::delete('/prescricoes/{prescricao}/anexos/{anexo}', [PrescricaoController::class, 'destroyAnexo'])->name('prescricoes.anexos.destroy');
 
+    // Observações da prescrição (linha do tempo com autor e data/hora)
+    Route::post('/prescricoes/{prescricao}/observacoes', [PrescricaoController::class, 'storeObservacao'])->name('prescricoes.observacoes.store');
+
     // Semanas da prescrição (acessar, editar e excluir)
     Route::get('/prescricoes/{prescricao}/semanas/{semana}', [PrescricaoSemanaController::class, 'show'])->name('prescricoes.semanas.show');
     Route::get('/prescricoes/{prescricao}/semanas/{semana}/editar', [PrescricaoSemanaController::class, 'edit'])->name('prescricoes.semanas.edit');
@@ -183,6 +188,16 @@ Route::middleware('auth')->group(function () {
 
     // Envio da semana para a fila de atendimento (exige parcela paga ou autorização de administrador)
     Route::post('/prescricoes/{prescricao}/semanas/{semana}/fila-atendimento', [PrescricaoSemanaController::class, 'enviarParaFila'])->name('prescricoes.semanas.fila');
+
+    // Volta da semana para o agendamento (paciente não compareceu)
+    Route::post('/prescricoes/{prescricao}/semanas/{semana}/devolver-agendada', [PrescricaoSemanaController::class, 'devolverParaAgendada'])->name('prescricoes.semanas.devolver');
+
+    // Atendimento da enfermagem (início do atendimento da semana)
+    Route::post('/prescricoes/{prescricao}/semanas/{semana}/iniciar-atendimento', [PrescricaoSemanaController::class, 'iniciarAtendimento'])->name('prescricoes.semanas.atendimento.iniciar');
+
+    // Registro da aplicação (código de barras, lote, vencimento e observações)
+    Route::get('/prescricoes/{prescricao}/semanas/{semana}/aplicar', [PrescricaoSemanaController::class, 'formAplicacao'])->name('prescricoes.semanas.aplicar.form');
+    Route::post('/prescricoes/{prescricao}/semanas/{semana}/aplicar', [PrescricaoSemanaController::class, 'aplicar'])->name('prescricoes.semanas.aplicar');
 
     // Pagamentos do financeiro (alocados da 1ª para a última parcela)
     Route::post('/prescricoes/{prescricao}/pagamentos', [FinanceiroPagamentoController::class, 'store'])->name('prescricoes.pagamentos.store');

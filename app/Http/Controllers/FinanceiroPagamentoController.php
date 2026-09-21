@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Enums\FormaPagamento;
+use App\Enums\TipoLogPrescricao;
 use App\Models\FinanceiroPagamento;
 use App\Models\Prescricao;
+use App\Models\PrescricaoLog;
 use App\Services\FinanceiroPagamentoService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -48,7 +50,19 @@ class FinanceiroPagamentoController extends Controller
             'data_pagamento.required' => 'Informe a data do pagamento.',
         ]);
 
-        $this->pagamentos->registrar($financeiro, $dados);
+        $pagamento = $this->pagamentos->registrar($financeiro, $dados);
+
+        PrescricaoLog::registrar($prescricao, TipoLogPrescricao::PagamentoRegistrado, 'Pagamento registrado: '
+            .$pagamento->valor_formatado.'.', [
+            'detalhes' => array_filter([
+                'Valor' => $pagamento->valor_formatado,
+                'Forma de pagamento' => $pagamento->forma_label,
+                'Parcelas' => (string) $pagamento->parcelas,
+                'Data do pagamento' => $pagamento->data_formatada,
+                'Observação' => $pagamento->observacao,
+                'Total recebido' => $financeiro->refresh()->valor_recebido_formatado,
+            ]),
+        ]);
 
         return redirect()
             ->route('prescricoes.show', ['prescricao' => $prescricao, 'aba' => 'financeiro'])
@@ -61,6 +75,16 @@ class FinanceiroPagamentoController extends Controller
     public function destroy(Prescricao $prescricao, FinanceiroPagamento $pagamento)
     {
         abort_if($pagamento->financeiro?->prescricao_id !== $prescricao->id, 404);
+
+        PrescricaoLog::registrar($prescricao, TipoLogPrescricao::PagamentoRemovido, 'Pagamento removido: '
+            .$pagamento->valor_formatado.'.', [
+            'detalhes' => array_filter([
+                'Valor' => $pagamento->valor_formatado,
+                'Forma de pagamento' => $pagamento->forma_label,
+                'Data do pagamento' => $pagamento->data_formatada,
+                'Observação' => $pagamento->observacao,
+            ]),
+        ]);
 
         $this->pagamentos->excluir($pagamento);
 

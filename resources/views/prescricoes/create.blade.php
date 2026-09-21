@@ -30,12 +30,31 @@
             <label class="form-label" for="paciente_id">Paciente *</label>
             <select id="paciente_id" name="paciente_id" class="form-select" required>
               @if ($pacienteSelecionado)
-                <option value="{{ $pacienteSelecionado->id }}" selected>{{ $pacienteSelecionado->nome }}</option>
+                <option
+                  value="{{ $pacienteSelecionado->id }}"
+                  data-observacao="{{ $pacienteSelecionado->observacao }}"
+                  selected>
+                  {{ $pacienteSelecionado->nome }}
+                </option>
               @endif
             </select>
             <small class="text-muted">
               Digite o nome (ou o CPF) para buscar. Os pacientes vêm da base importada da Feegow.
             </small>
+
+            {{-- Observação cadastrada no paciente: aparece antes de montar a prescrição --}}
+            <div
+              class="alert alert-warning d-flex gap-2 {{ $pacienteSelecionado?->observacao ? '' : 'd-none' }} mt-3 mb-0"
+              id="aviso-observacao-paciente"
+              role="alert">
+              <i class="ri-alert-line ri-20px"></i>
+              <div>
+                <strong class="d-block">Atenção: observação do paciente</strong>
+                <span
+                  id="aviso-observacao-paciente-texto"
+                  style="white-space: pre-line;">{{ $pacienteSelecionado?->observacao }}</span>
+              </div>
+            </div>
           </div>
 
           <div class="col-md-6">
