@@ -10,6 +10,7 @@ enum TipoMovimentacaoEstoque: string
     case Transferencia = 'transferencia';
     case Consumo = 'consumo';
     case Ajuste = 'ajuste';
+    case Abertura = 'abertura';
 
     public function label(): string
     {
@@ -20,6 +21,7 @@ enum TipoMovimentacaoEstoque: string
             self::Transferencia => 'Transferência',
             self::Consumo => 'Consumo',
             self::Ajuste => 'Ajuste',
+            self::Abertura => 'Abertura de vasilhame',
         };
     }
 
@@ -31,8 +33,20 @@ enum TipoMovimentacaoEstoque: string
         return match ($this) {
             self::Entrada => 'success',
             self::Estorno => 'danger',
-            self::Ajuste => 'info',
+            self::Ajuste, self::Abertura => 'info',
             default => 'warning',
         };
+    }
+
+    /**
+     * Opções para popular selects/menus.
+     *
+     * @return array<string, string>
+     */
+    public static function opcoes(): array
+    {
+        return collect(self::cases())
+            ->mapWithKeys(fn (self $tipo) => [$tipo->value => $tipo->label()])
+            ->all();
     }
 }

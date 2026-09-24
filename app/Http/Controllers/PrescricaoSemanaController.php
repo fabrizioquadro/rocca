@@ -3,16 +3,23 @@
 namespace App\Http\Controllers;
 
 use App\Enums\StatusSemana;
+use App\Enums\StatusSemanaItem;
 use App\Enums\TipoLogPrescricao;
+use App\Enums\TipoMedicamento;
 use App\Models\Combo;
 use App\Models\Medicamento;
 use App\Models\Prescricao;
 use App\Models\PrescricaoLog;
 use App\Models\PrescricaoSemana;
 use App\Models\PrescricaoSemanaAtendimento;
+use App\Models\PrescricaoSemanaItem;
+use App\Models\VasilhameAberto;
+use App\Services\EstoqueVasilhameService;
 use App\Services\PrescricaoSemanaService;
+use App\Support\Numero;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -23,8 +30,10 @@ use Illuminate\Validation\ValidationException;
  */
 class PrescricaoSemanaController extends Controller
 {
-    public function __construct(private PrescricaoSemanaService $semanas)
-    {
+    public function __construct(
+        private PrescricaoSemanaService $semanas,
+        private EstoqueVasilhameService $vasilhames
+    ) {
     }
 
     /**
@@ -34,9 +43,27 @@ class PrescricaoSemanaController extends Controller
     {
         $this->garantirSemanaDaPrescricao($prescricao, $semana);
 
-        $semana->load(['itens.medicamento', 'itens.combo', 'parcelas', 'atendimentos.iniciadoPor']);
+        $semana->load([
+            'itens.medicamento',
+            'itens.combo',
+            'parcelas',
+            'liberadoPor',
+            'atendimentos.iniciadoPor',
+            'atendimentos.aplicacoes.item',
+            'atendimentos.aplicacoes.medicamento',
+            'atendimentos.aplicacoes.user',
+        ]);
 
-        return view('prescricoes.semanas.show', compact('prescricao', 'semana'));
+        // Semanas vizinhas, na ordem da prescrição (para navegar entre elas)
+        $semanas = $prescricao->semanas()->orderBy('numero')->get();
+        $posicao = (int) $semanas->search(fn (PrescricaoSemana $item) => $item->id === $semana->id);
+
+        return view('prescricoes.semanas.show', [
+            'prescricao' => $prescricao,
+            'semana' => $semana,
+            'semanaAnterior' => $posicao > 0 ? $semanas->get($posicao - 1) : null,
+            'semanaProxima' => $semanas->get($posicao + 1),
+        ]);
     }
 
     /**
@@ -259,6 +286,13 @@ class PrescricaoSemanaController extends Controller
             );
         });
 
+        // Enviada pela aba Semanas da prescrição: o usuário continua por lá
+        if ($request->input('origem') === 'semanas') {
+            return redirect()
+                ->route('prescricoes.show', ['prescricao' => $prescricao, 'aba' => 'semanas'])
+                ->with('success', 'Semana enviada para a fila de atendimento.');
+        }
+
         return redirect()
             ->route('prescricoes.semanas.show', [$prescricao, $semana])
             ->with('success', 'Semana enviada para a fila de atendimento.');
@@ -287,9 +321,115 @@ class PrescricaoSemanaController extends Controller
         }
 
         $semana->load(['itens.medicamento', 'itens.combo.itens.medicamento']);
-        $atendimento->load(['aplicacoes.item', 'aplicacoes.entradaItem', 'aplicacoes.medicamento', 'aplicacoes.user']);
+        $atendimento->load(['aplicacoes.item', 'aplicacoes.entradaItem', 'aplicacoes.medicamento', 'aplicacoes.user', 'aplicacoes.vasilhameAberto']);
 
-        return view('prescricoes.semanas.aplicar', compact('prescricao', 'semana', 'atendimento'));
+        // Medicamentos por mg desta aplicação: são eles que podem abrir vasilhame
+        $medicamentosMiligrama = $this->medicamentosMiligramaDaSemana($semana);
+
+        $vasilhamesAbertos = VasilhameAberto::emUsoDosMedicamentos(
+            $medicamentosMiligrama->pluck('id')->all(),
+            (int) $prescricao->clinica_id
+        );
+
+        return view('prescricoes.semanas.aplicar', compact(
+            'prescricao',
+            'semana',
+            'atendimento',
+            'medicamentosMiligrama',
+            'vasilhamesAbertos'
+        ));
+    }
+
+    /**
+     * Abre um vasilhame (medicamento do tipo miligrama) usado nesta aplicação:
+     * o frasco sai do estoque fechado e passa a ter saldo em mg.
+     *
+     * Só medicamento que faz parte da aplicação pode ser aberto por aqui.
+     */
+    public function abrirVasilhame(Request $request, Prescricao $prescricao, PrescricaoSemana $semana)
+    {
+        $this->garantirSemanaDaPrescricao($prescricao, $semana);
+
+        $dados = $request->validate([
+            'medicamento_id' => ['required', 'integer', 'exists:medicamentos,id'],
+            'codigo_barras' => ['required', 'string', 'max:100'],
+            'observacao' => ['nullable', 'string', 'max:1000'],
+        ], [
+            'medicamento_id.required' => 'Escolha o medicamento do vasilhame.',
+            'medicamento_id.exists' => 'Medicamento não encontrado.',
+            'codigo_barras.required' => 'Leia o código de barras do vasilhame.',
+        ]);
+
+        $permitidos = $this->medicamentosMiligramaDaSemana($semana);
+
+        if (! $permitidos->contains('id', (int) $dados['medicamento_id'])) {
+            throw ValidationException::withMessages([
+                'vasilhame' => 'Este medicamento não faz parte desta aplicação.',
+            ]);
+        }
+
+        DB::transaction(function () use ($dados, $prescricao, $semana) {
+            $vasilhame = $this->vasilhames->abrirPorCodigo(
+                $dados['codigo_barras'],
+                (int) $dados['medicamento_id'],
+                (int) $prescricao->clinica_id,
+                $dados['observacao'] ?? null
+            );
+
+            $vasilhame->load(['medicamento', 'entradaItem']);
+
+            PrescricaoLog::registrar(
+                $prescricao,
+                TipoLogPrescricao::VasilhameAberto,
+                'Vasilhame '.$vasilhame->codigo_barras.' aberto com '
+                    .Numero::formatar($vasilhame->mg_restantes).' mg.',
+                ['detalhes' => array_filter([
+                    'Medicamento' => $vasilhame->medicamento?->nome,
+                    'Código de barras' => $vasilhame->codigo_barras,
+                    'Lote' => $vasilhame->lote,
+                    'Vencimento' => $vasilhame->vencimento_formatado,
+                    'Saldo do vasilhame' => Numero::formatar($vasilhame->mg_restantes).' mg',
+                    'Clínica' => $prescricao->clinica?->nome,
+                    'Observação' => $dados['observacao'] ?? null,
+                ])],
+                $semana->id
+            );
+        });
+
+        return back()->with('success', 'Vasilhame aberto com sucesso.');
+    }
+
+    /**
+     * Medicamentos do tipo miligrama que fazem parte desta aplicação (itens
+     * que ainda faltam aplicar) + os EQUIVALENTES DO MESMO GRUPO.
+     *
+     * O grupo reúne o mesmo produto com vasilhames de tamanhos diferentes
+     * (ex.: Mounjaro 60MG e Mounjaro 90MG): qualquer um deles pode ter o
+     * vasilhame aberto e usado na aplicação.
+     *
+     * @return Collection<int, Medicamento>
+     */
+    private function medicamentosMiligramaDaSemana(PrescricaoSemana $semana): Collection
+    {
+        $semana->loadMissing(['itens.medicamento', 'itens.combo.itens.medicamento']);
+
+        $doItens = $semana->itens
+            ->filter(fn (PrescricaoSemanaItem $item) => $item->gera_aplicacao
+                && $item->status !== StatusSemanaItem::Aplicado)
+            ->map(fn (PrescricaoSemanaItem $item) => $item->medicamento)
+            ->filter(fn ($medicamento) => $medicamento?->eh_miligrama)
+            ->unique('id');
+
+        $doGrupo = Medicamento::query()
+            ->whereIn('grupo_id', $doItens->pluck('grupo_id')->filter()->unique()->all())
+            ->where('tipo', TipoMedicamento::Miligrama->value)
+            ->get();
+
+        return $doItens
+            ->concat($doGrupo)
+            ->unique('id')
+            ->sortBy('nome')
+            ->values();
     }
 
     /**
@@ -318,6 +458,9 @@ class PrescricaoSemanaController extends Controller
             'itens' => ['required', 'array'],
             'itens.*.situacao' => ['nullable', Rule::in(['aplicado', 'pendente'])],
             'itens.*.codigo_barras' => ['nullable', 'string', 'max:100'],
+            'itens.*.codigo_barras_2' => ['nullable', 'string', 'max:100'],
+            'itens.*.quantidade_1' => ['nullable'],
+            'itens.*.quantidade_2' => ['nullable'],
             'itens.*.quantidade' => ['nullable'],
             'itens.*.aplicado_em' => ['nullable', 'date'],
             'itens.*.observacao' => ['nullable', 'string', 'max:1000'],

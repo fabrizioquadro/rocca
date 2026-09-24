@@ -276,6 +276,40 @@ class PrescricaoSemana extends Model
     }
 
     /**
+     * A listagem de semanas oferece "Enviar para Fila de Aplicação"? Só para
+     * semana paga que ainda não entrou no fluxo: "Agendada" ou com aplicação
+     * parcial (a volta do paciente).
+     */
+    private function envioParaFilaNoMenu(): bool
+    {
+        return in_array($this->status, [StatusSemana::Agendada, StatusSemana::AplicacaoParcial], true)
+            && (bool) $this->parcelas->first()?->esta_paga;
+    }
+
+    /**
+     * O envio pelo menu está liberado? Sem isso a opção aparece desabilitada
+     * com o motivo (aplicação sequencial).
+     */
+    public function getPodeEnviarParaFilaAttribute(): bool
+    {
+        return $this->envioParaFilaNoMenu()
+            && ($this->status !== StatusSemana::Agendada || $this->pode_ir_para_fila);
+    }
+
+    /**
+     * Por que o menu não deixa enviar (opção desabilitada com o tooltip)?
+     * Null quando o envio está liberado ou quando a opção nem aparece.
+     */
+    public function getMotivoBloqueioEnvioFilaAttribute(): ?string
+    {
+        if (! $this->envioParaFilaNoMenu() || $this->pode_enviar_para_fila) {
+            return null;
+        }
+
+        return $this->motivo_bloqueio_fila;
+    }
+
+    /**
      * A semana pode voltar para "Agendada"? Só enquanto está na fila de
      * aplicação ou em atendimento e nenhuma aplicação foi registrada — é o
      * caminho de volta do paciente que não compareceu.

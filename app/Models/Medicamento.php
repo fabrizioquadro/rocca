@@ -7,6 +7,7 @@ use App\Enums\TipoMedicamento;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 
 class Medicamento extends Model
 {
@@ -67,6 +68,56 @@ class Medicamento extends Model
     public function movimentacoes()
     {
         return $this->hasMany(EstoqueMovimentacao::class, 'medicamento_id');
+    }
+
+    /**
+     * Vasilhames abertos (só medicamento do tipo miligrama).
+     */
+    public function vasilhamesAbertos()
+    {
+        return $this->hasMany(VasilhameAberto::class, 'medicamento_id');
+    }
+
+    /**
+     * O medicamento é controlado por vasilhame (tipo miligrama)?
+     */
+    public function getEhMiligramaAttribute(): bool
+    {
+        return $this->tipo === TipoMedicamento::Miligrama;
+    }
+
+    /**
+     * IDs dos medicamentos equivalentes: ele mesmo + os do MESMO GRUPO.
+     *
+     * O grupo reúne o mesmo produto com vasilhames de tamanhos diferentes
+     * (ex.: Mounjaro 60MG e Mounjaro 90MG), então um vasilhame de qualquer
+     * deles pode ser usado na aplicação.
+     *
+     * @return Collection<int, int>
+     */
+    public function idsDoMesmoProduto(): Collection
+    {
+        if ($this->grupo_id === null) {
+            return collect([$this->id]);
+        }
+
+        return static::query()
+            ->where('grupo_id', $this->grupo_id)
+            ->pluck('id')
+            ->push($this->id)
+            ->unique()
+            ->values();
+    }
+
+    /**
+     * Mg disponíveis nos vasilhames abertos (null = todas as clínicas).
+     */
+    public function mgAbertos(?int $clinicaId = null): float
+    {
+        return (float) $this->vasilhamesAbertos()
+            ->emUso()
+            ->when($clinicaId, fn ($query) => $query->where('clinica_id', $clinicaId))
+            ->sum('mg_restantes');
     }
 
     /**

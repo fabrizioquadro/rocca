@@ -87,6 +87,17 @@ class PrescricaoSemanaItem extends Model
     }
 
     /**
+     * O item é um medicamento controlado por vasilhame (tipo miligrama)?
+     * Nesse caso a quantidade é em mg e a aplicação sai de um vasilhame aberto.
+     * Combo continua com a regra própria (aplicação por unidade).
+     */
+    public function getEhMiligramaAttribute(): bool
+    {
+        return $this->tipo === 'medicamento'
+            && $this->medicamento?->tipo === TipoMedicamento::Miligrama;
+    }
+
+    /**
      * Valor total do item (quantidade cobrada x valor).
      */
     public function getValorTotalAttribute(): float

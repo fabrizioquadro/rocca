@@ -23,6 +23,9 @@
                   · {{ $medicamento->fabricante }}
                 @endif
                 · {{ $total }} unidade(s) em estoque
+                @if ($medicamento->eh_miligrama)
+                  · {{ \App\Support\Numero::formatar($mgAbertos) }} mg em vasilhames abertos
+                @endif
               </div>
             </div>
 
@@ -71,7 +74,12 @@
             </div>
           </div>
 
-          <h6 class="fw-semibold mt-6 mb-3">Detalhe por clínica, código de barras e lote</h6>
+          <h6 class="fw-semibold mt-6 mb-3">
+            Detalhe por clínica, código de barras e lote
+            @if ($medicamento->eh_miligrama)
+              <span class="text-body-secondary fw-normal">(vasilhames fechados)</span>
+            @endif
+          </h6>
 
           <div class="table-responsive">
             <table class="table table-sm table-bordered align-middle">
@@ -82,20 +90,30 @@
                   <th>Lote</th>
                   <th>Vencimento</th>
                   <th class="text-end" style="width: 130px;">Quantidade</th>
+                  <th class="text-center" style="width: 110px;">Inventário</th>
                 </tr>
               </thead>
               <tbody>
                 @forelse ($linhas as $linha)
                   <tr>
                     <td>{{ $linha['clinica'] }}</td>
-                    <td>{{ $linha['codigo_barras'] }}</td>
+                    <td class="font-monospace">{{ $linha['codigo_barras'] }}</td>
                     <td>{{ $linha['lote'] }}</td>
                     <td>{{ $linha['vencimento_formatado'] }}</td>
                     <td class="text-end fw-semibold">{{ $linha['quantidade'] }}</td>
+                    <td class="text-center">
+                      {{-- Histórico do código: entradas, saídas, transferências e aplicações --}}
+                      <a
+                        href="{{ route('estoque.saldo.inventario', [$linha['entrada_item_id'], 'clinica_id' => $linha['clinica_id']]) }}"
+                        class="btn btn-sm btn-icon btn-text-secondary waves-effect"
+                        title="Inventário do código de barras">
+                        <i class="ri-file-list-3-line"></i>
+                      </a>
+                    </td>
                   </tr>
                 @empty
                   <tr>
-                    <td colspan="5" class="text-center text-muted py-4">Nenhuma unidade deste medicamento em estoque.</td>
+                    <td colspan="6" class="text-center text-muted py-4">Nenhuma unidade deste medicamento em estoque.</td>
                   </tr>
                 @endforelse
               </tbody>
@@ -103,10 +121,74 @@
                 <tr>
                   <th colspan="4" class="text-end">Total</th>
                   <th class="text-end">{{ $total }}</th>
+                  <th></th>
                 </tr>
               </tfoot>
             </table>
           </div>
+
+          @if ($medicamento->eh_miligrama)
+            {{-- Vasilhames abertos: cada um tem o próprio saldo em mg --}}
+            <h6 class="fw-semibold mt-6 mb-3">Vasilhames abertos</h6>
+
+            <div class="table-responsive">
+              <table class="table table-sm table-bordered align-middle">
+                <thead class="table-light">
+                  <tr>
+                    <th>Clínica</th>
+                    <th>Código de barras</th>
+                    <th>Lote</th>
+                    <th>Vencimento</th>
+                    <th class="text-end" style="width: 130px;">Mg restantes</th>
+                    <th style="width: 120px;">Situação</th>
+                    <th>Aberto</th>
+                    <th class="text-center" style="width: 110px;">Inventário</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @forelse ($vasilhames as $vasilhame)
+                    <tr>
+                      <td>{{ $vasilhame->clinica?->nome ?? '—' }}</td>
+                      <td class="font-monospace">{{ $vasilhame->codigo_barras ?? '—' }}</td>
+                      <td>{{ $vasilhame->lote ?? '—' }}</td>
+                      <td>{{ $vasilhame->vencimento_formatado ?? '—' }}</td>
+                      <td class="text-end fw-semibold">{{ \App\Support\Numero::formatar($vasilhame->mg_restantes) }}</td>
+                      <td>
+                        @if ($vasilhame->esta_em_uso)
+                          <span class="badge bg-label-success">Em uso</span>
+                        @else
+                          <span class="badge bg-label-secondary">Esgotado</span>
+                        @endif
+                      </td>
+                      <td class="small text-body-secondary">{{ $vasilhame->descricao_abertura }}</td>
+                      <td class="text-center">
+                        {{-- Histórico do frasco: aplicações e baixas em mg --}}
+                        <a
+                          href="{{ route('estoque.saldo.inventario', [$vasilhame->entrada_item_id, 'clinica_id' => $vasilhame->clinica_id]) }}"
+                          class="btn btn-sm btn-icon btn-text-secondary waves-effect"
+                          title="Inventário do código de barras">
+                          <i class="ri-file-list-3-line"></i>
+                        </a>
+                      </td>
+                    </tr>
+                  @empty
+                    <tr>
+                      <td colspan="8" class="text-center text-muted py-4">
+                        Nenhum vasilhame aberto.
+                      </td>
+                    </tr>
+                  @endforelse
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th colspan="4" class="text-end">Em uso</th>
+                    <th class="text-end">{{ \App\Support\Numero::formatar($mgAbertos) }}</th>
+                    <th colspan="3"></th>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          @endif
         </div>
         <!-- /Resumo -->
       </div>

@@ -66,6 +66,23 @@ class EntradaItem extends Model
     }
 
     /**
+     * Vasilhames abertos deste código de barras (medicamento miligrama).
+     */
+    public function vasilhamesAbertos()
+    {
+        return $this->hasMany(VasilhameAberto::class, 'entrada_item_id');
+    }
+
+    /**
+     * O lote está vencido? (vence no próprio dia ainda vale)
+     */
+    public function getEstaVencidoAttribute(): bool
+    {
+        return $this->vencimento !== null
+            && $this->vencimento->copy()->startOfDay()->lt(now()->startOfDay());
+    }
+
+    /**
      * Vencimento formatado (d/m/Y).
      */
     public function getVencimentoFormatadoAttribute(): ?string

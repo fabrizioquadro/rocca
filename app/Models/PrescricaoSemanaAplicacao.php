@@ -29,6 +29,7 @@ class PrescricaoSemanaAplicacao extends Model
         'prescricao_semana_atendimento_id',
         'prescricao_semana_item_id',
         'entrada_item_id',
+        'vasilhame_aberto_id',
         'medicamento_id',
         'codigo_barras',
         'lote',
@@ -72,6 +73,22 @@ class PrescricaoSemanaAplicacao extends Model
     public function entradaItem()
     {
         return $this->belongsTo(EntradaItem::class, 'entrada_item_id');
+    }
+
+    /**
+     * Vasilhame aberto de onde saiu o medicamento (medicamento miligrama).
+     */
+    public function vasilhameAberto()
+    {
+        return $this->belongsTo(VasilhameAberto::class, 'vasilhame_aberto_id');
+    }
+
+    /**
+     * Quantidade com a unidade: vasilhame sai em mg, o resto em unidade.
+     */
+    public function getQuantidadeComUnidadeAttribute(): string
+    {
+        return $this->quantidade_formatada.($this->vasilhame_aberto_id ? ' mg' : '');
     }
 
     /**

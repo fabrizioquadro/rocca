@@ -16,6 +16,7 @@ enum TipoLogPrescricao: string
     case AtendimentoIniciado = 'atendimento_iniciado';
     case AtendimentoFinalizado = 'atendimento_finalizado';
     case Aplicacao = 'aplicacao';
+    case VasilhameAberto = 'vasilhame_aberto';
     case ItemPendente = 'item_pendente';
     case PagamentoRegistrado = 'pagamento_registrado';
     case PagamentoRemovido = 'pagamento_removido';
@@ -37,6 +38,7 @@ enum TipoLogPrescricao: string
             self::AtendimentoIniciado => 'Atendimento iniciado',
             self::AtendimentoFinalizado => 'Atendimento finalizado',
             self::Aplicacao => 'Medicamento aplicado',
+            self::VasilhameAberto => 'Vasilhame aberto',
             self::ItemPendente => 'Medicamento pendente',
             self::PagamentoRegistrado => 'Pagamento registrado',
             self::PagamentoRemovido => 'Pagamento removido',
@@ -58,7 +60,7 @@ enum TipoLogPrescricao: string
             self::Aplicacao, self::PagamentoRegistrado, self::AtendimentoFinalizado => 'bg-label-success',
             self::SemanaEditada, self::FinanceiroAjustado, self::ItemPendente => 'bg-label-warning',
             self::SemanaExcluida, self::Exclusao, self::PagamentoRemovido, self::AnexoRemovido => 'bg-label-danger',
-            self::EnvioFila, self::AtendimentoIniciado => 'bg-label-info',
+            self::EnvioFila, self::AtendimentoIniciado, self::VasilhameAberto => 'bg-label-info',
             self::Devolucao => 'bg-label-secondary',
         };
     }
@@ -78,6 +80,7 @@ enum TipoLogPrescricao: string
             self::AtendimentoIniciado => 'ri-play-circle-line',
             self::AtendimentoFinalizado => 'ri-flag-2-line',
             self::Aplicacao => 'ri-syringe-line',
+            self::VasilhameAberto => 'ri-archive-2-line',
             self::ItemPendente => 'ri-error-warning-line',
             self::PagamentoRegistrado => 'ri-money-dollar-circle-line',
             self::PagamentoRemovido => 'ri-refund-2-line',

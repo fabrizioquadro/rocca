@@ -27,6 +27,7 @@ class PrescricaoSemanaAtendimento extends Model
      */
     protected $fillable = [
         'prescricao_semana_id',
+        'chegada_em',
         'iniciado_em',
         'iniciado_por_user_id',
         'finalizado_em',
@@ -40,6 +41,7 @@ class PrescricaoSemanaAtendimento extends Model
      * @var array<string, string>
      */
     protected $casts = [
+        'chegada_em' => 'datetime',
         'iniciado_em' => 'datetime',
         'finalizado_em' => 'datetime',
     ];
@@ -108,6 +110,14 @@ class PrescricaoSemanaAtendimento extends Model
     public function getIniciadoEmFormatadoAttribute(): ?string
     {
         return $this->iniciado_em?->format('d/m/Y H:i');
+    }
+
+    /**
+     * Chegada do paciente na sessão (d/m/Y H:i).
+     */
+    public function getChegadaEmFormatadaAttribute(): ?string
+    {
+        return $this->chegada_em?->format('d/m/Y H:i');
     }
 
     /**

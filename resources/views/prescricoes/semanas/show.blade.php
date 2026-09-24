@@ -348,9 +348,33 @@
     </div>
   </div>
 
+  @php
+    // Uma linha por medicamento aplicado (um vasilhame por linha), na ordem
+    // dos atendimentos e do momento da aplicação
+    $aplicacoesDosAtendimentos = $semana->atendimentos
+        ->flatMap(fn ($atendimento) => $atendimento->aplicacoes
+            ->sortBy('aplicado_em')
+            ->map(fn ($aplicacao) => ['atendimento' => $atendimento, 'aplicacao' => $aplicacao]))
+        ->values();
+
+    // Junta os valores distintos de uma coluna das aplicações do item
+    $juntar = fn ($aplicacoes, callable $valor) => $aplicacoes
+        ->map($valor)
+        ->filter(fn ($texto) => filled($texto) && $texto !== '—')
+        ->unique()
+        ->implode(' · ');
+  @endphp
+
   <div class="card">
-    <div class="card-header">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
       <h6 class="fw-semibold mb-0">Itens da semana</h6>
+
+      @if ($aplicacoesDosAtendimentos->isNotEmpty())
+        <span class="text-muted small">
+          {{ $aplicacoesDosAtendimentos->count() }} aplicação(ões)
+          em {{ $semana->atendimentos->count() }} atendimento(s)
+        </span>
+      @endif
     </div>
 
     <div class="card-body">
@@ -363,20 +387,62 @@
           <table class="table table-sm table-bordered align-middle mb-0">
             <thead class="table-light">
               <tr>
-                <th style="width: 140px;">Tipo</th>
-                <th>Medicamento / Combo</th>
-                <th style="width: 120px;">Quantidade</th>
-                <th style="width: 150px;" class="text-end">Valor unitário</th>
-                <th style="width: 150px;" class="text-end">Total</th>
-                <th style="width: 180px;">Aplicação</th>
+                <th style="min-width: 190px;">Medicamento</th>
+                <th style="width: 100px;">Quantidade</th>
+                <th style="width: 120px;" class="text-end">Valor unitário</th>
+                <th style="width: 120px;" class="text-end">Total</th>
+                <th style="width: 130px;">Situação</th>
+                <th style="width: 145px;">Chegada</th>
+                <th style="width: 145px;">Atendimento</th>
+                <th style="width: 145px;">Aplicação</th>
+                <th style="min-width: 165px;">Quem aplicou</th>
+                <th style="width: 130px;">Código de barras</th>
+                <th style="width: 100px;">Lote</th>
+                <th style="width: 105px;">Vencimento</th>
               </tr>
             </thead>
             <tbody>
               @foreach ($semana->itens as $item)
+                @php
+                  // Aplicações deste item em todos os atendimentos
+                  $aplicacoesDoItem = $aplicacoesDosAtendimentos
+                      ->filter(fn ($linha) => $linha['aplicacao']->prescricao_semana_item_id === $item->id)
+                      ->values();
+                @endphp
+
+                {{-- Item + aplicações, tudo na mesma linha --}}
                 <tr>
-                  <td>{{ $item->tipo === 'combo' ? 'Combo' : 'Medicamento' }}</td>
-                  <td>{{ $item->nome }}</td>
-                  <td>{{ $item->quantidade_formatada }}</td>
+                  <td>
+                    <span class="fw-semibold">{{ $item->nome }}</span>
+                    <small class="text-body-secondary d-block">
+                      {{ $item->tipo === 'combo' ? 'Combo' : 'Medicamento' }}
+                    </small>
+
+                    {{-- No combo, qual componente foi aplicado --}}
+                    @if ($item->tipo === 'combo' && $aplicacoesDoItem->isNotEmpty())
+                      <small class="text-body-secondary d-block">
+                        {{ $aplicacoesDoItem->map(fn ($linha) => $linha['aplicacao']->medicamento?->nome)->filter()->unique()->implode(' · ') }}
+                      </small>
+                    @endif
+
+                    {{-- Vasilhame de outro tamanho do mesmo grupo (ex.: 60MG no item 90MG) --}}
+                    @if ($item->tipo !== 'combo'
+                        && $aplicacoesDoItem->contains(fn ($linha) => (int) $linha['aplicacao']->medicamento_id !== (int) $item->medicamento_id))
+                      <small class="text-warning d-block">
+                        {{ $aplicacoesDoItem->map(fn ($linha) => $linha['aplicacao']->medicamento?->nome)->filter()->unique()->implode(' · ') }}
+                      </small>
+                    @endif
+                  </td>
+                  <td>
+                    {{ $item->eh_miligrama ? $item->quantidade_formatada.' mg' : $item->quantidade_formatada }}
+
+                    {{-- Divisão entre vasilhames (ex.: 2 mg + 2,25 mg) --}}
+                    @if ($aplicacoesDoItem->count() > 1)
+                      <small class="text-body-secondary d-block">
+                        {{ $aplicacoesDoItem->map(fn ($linha) => $linha['aplicacao']->quantidade_com_unidade)->implode(' + ') }}
+                      </small>
+                    @endif
+                  </td>
                   <td class="text-end">{{ $item->valor_formatado }}</td>
                   <td class="text-end fw-semibold">{{ $item->valor_total_formatado }}</td>
                   <td>
@@ -386,21 +452,65 @@
                       <span class="badge bg-label-secondary">Não se aplica</span>
                     @endif
                   </td>
+                  <td>{{ $juntar($aplicacoesDoItem, fn ($linha) => $linha['atendimento']->chegada_em_formatada) ?: '—' }}</td>
+                  <td>{{ $juntar($aplicacoesDoItem, fn ($linha) => $linha['atendimento']->iniciado_em_formatado) ?: '—' }}</td>
+                  <td>{{ $juntar($aplicacoesDoItem, fn ($linha) => $linha['aplicacao']->aplicado_em_formatado) ?: '—' }}</td>
+                  <td>{{ $juntar($aplicacoesDoItem, fn ($linha) => $linha['aplicacao']->user?->nome) ?: '—' }}</td>
+                  <td class="font-monospace">{{ $juntar($aplicacoesDoItem, fn ($linha) => $linha['aplicacao']->codigo_barras) ?: '—' }}</td>
+                  <td>{{ $juntar($aplicacoesDoItem, fn ($linha) => $linha['aplicacao']->lote) ?: '—' }}</td>
+                  <td>{{ $juntar($aplicacoesDoItem, fn ($linha) => $linha['aplicacao']->vencimento_formatado) ?: '—' }}</td>
                 </tr>
               @endforeach
             </tbody>
             <tfoot>
               <tr>
-                <th colspan="4" class="text-end">Total da semana</th>
+                <th colspan="3" class="text-end">Total da semana</th>
                 <th class="text-end">{{ $semana->valor_total_formatado }}</th>
-                <th></th>
+                <th colspan="8"></th>
               </tr>
             </tfoot>
           </table>
         </div>
       @endif
+
+      @if ($semana->atendimentos->contains(fn ($atendimento) => $atendimento->em_andamento))
+        <p class="text-muted small mb-0 mt-2">
+          O atendimento em andamento ainda não foi finalizado.
+        </p>
+      @endif
     </div>
   </div>
+
+  {{-- Navegação entre as semanas da prescrição (só as que existirem) --}}
+  @if ($semanaAnterior || $semanaProxima)
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-4">
+      @if ($semanaAnterior)
+        <a
+          href="{{ route('prescricoes.semanas.show', [$prescricao, $semanaAnterior]) }}"
+          class="btn btn-outline-primary">
+          <i class="ri-arrow-left-line me-1"></i>
+          Semana {{ $semanaAnterior->numero }}
+          @if ($semanaAnterior->data_prevista_formatada)
+            <span class="text-body-secondary small ms-1">· {{ $semanaAnterior->data_prevista_formatada }}</span>
+          @endif
+        </a>
+      @else
+        <span></span>
+      @endif
+
+      @if ($semanaProxima)
+        <a
+          href="{{ route('prescricoes.semanas.show', [$prescricao, $semanaProxima]) }}"
+          class="btn btn-outline-primary">
+          Semana {{ $semanaProxima->numero }}
+          @if ($semanaProxima->data_prevista_formatada)
+            <span class="text-body-secondary small ms-1">· {{ $semanaProxima->data_prevista_formatada }}</span>
+          @endif
+          <i class="ri-arrow-right-line ms-1"></i>
+        </a>
+      @endif
+    </div>
+  @endif
 @endsection
 
 @push('scripts')

@@ -302,6 +302,26 @@
                               <i class="ri-arrow-right-circle-line me-2"></i>Acessar
                             </a>
 
+                            {{-- Semana paga e ainda fora do fluxo (agendada ou com aplicação
+                                 parcial): entra na fila de aplicação direto daqui --}}
+                            @if ($semana->pode_enviar_para_fila)
+                              <form
+                                method="POST"
+                                action="{{ route('prescricoes.semanas.fila', [$prescricao, $semana]) }}"
+                                data-confirmar="Enviar a semana {{ $semana->numero }} para a fila de aplicação?">
+                                @csrf
+                                <input type="hidden" name="origem" value="semanas">
+                                <button type="submit" class="dropdown-item text-info">
+                                  <i class="ri-play-list-add-line me-2"></i>Enviar para Fila de Aplicação
+                                </button>
+                              </form>
+                            @elseif ($semana->motivo_bloqueio_envio_fila)
+                              {{-- Aplicação sequencial: mostra o motivo em vez de sumir com a opção --}}
+                              <span class="dropdown-item disabled" title="{{ $semana->motivo_bloqueio_envio_fila }}">
+                                <i class="ri-lock-line me-2"></i>Enviar para Fila de Aplicação
+                              </span>
+                            @endif
+
                             {{-- Paciente não compareceu: a semana volta para o agendamento --}}
                             @if ($semana->pode_voltar_para_agendada)
                               <form

@@ -32,6 +32,8 @@
             @foreach ($medicamentos as $medicamento)
               @php
                 $saldo = (int) $medicamento->saldo;
+                $mgAbertos = (float) ($medicamento->mg_abertos ?? 0);
+                $temEstoque = $saldo > 0 || $mgAbertos > 0;
                 $abaixoDoMinimo = $medicamento->estoque_minimo !== null && $saldo < (int) $medicamento->estoque_minimo;
               @endphp
               <tr>
@@ -46,12 +48,21 @@
                 <td class="fw-semibold">{{ $medicamento->nome }}</td>
                 <td>{{ $medicamento->grupo?->nome ?? '—' }}</td>
                 <td>{{ $medicamento->fabricante ?? '—' }}</td>
-                <td class="text-end fw-semibold {{ $saldo <= 0 ? 'text-danger' : '' }}">{{ $saldo }}</td>
+                <td class="text-end fw-semibold {{ $temEstoque ? '' : 'text-danger' }}">
+                  {{ $saldo }}
+
+                  @if ($medicamento->eh_miligrama)
+                    <small class="d-block fw-normal text-body-secondary">fechado(s)</small>
+                    <small class="d-block fw-normal text-body-secondary">
+                      {{ \App\Support\Numero::formatar($mgAbertos) }} mg abertos
+                    </small>
+                  @endif
+                </td>
                 <td>{{ $medicamento->estoque_minimo ?? '—' }}</td>
                 <td>
                   @if ($abaixoDoMinimo)
                     <span class="badge bg-label-danger">Abaixo do mínimo</span>
-                  @elseif ($saldo > 0)
+                  @elseif ($temEstoque)
                     <span class="badge bg-label-success">Em estoque</span>
                   @else
                     <span class="badge bg-label-secondary">Sem estoque</span>

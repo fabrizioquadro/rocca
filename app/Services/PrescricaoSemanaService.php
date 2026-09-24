@@ -21,6 +21,7 @@ use App\Models\PrescricaoSemana;
 use App\Models\PrescricaoSemanaAtendimento;
 use App\Models\PrescricaoSemanaItem;
 use App\Models\User;
+use App\Models\VasilhameAberto;
 use App\Support\Numero;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -33,8 +34,10 @@ use Illuminate\Validation\ValidationException;
  */
 class PrescricaoSemanaService
 {
-    public function __construct(private FinanceiroPagamentoService $pagamentos)
-    {
+    public function __construct(
+        private FinanceiroPagamentoService $pagamentos,
+        private EstoqueVasilhameService $vasilhames
+    ) {
     }
 
     /**
@@ -166,17 +169,23 @@ class PrescricaoSemanaService
      * anterior já tenha saído do agendamento) e a parcela da semana precisa
      * estar paga. Sem o pagamento, só é liberado com a autorização de um
      * administrador (email + senha), e fica gravado quem liberou e quando.
+     *
+     * A semana com aplicação parcial também entra: o paciente voltou para
+     * completar a aplicação. Nesse caso a regra sequencial não se aplica (a
+     * semana já saiu do agendamento muito antes).
      */
     public function enviarParaFilaDeAtendimento(PrescricaoSemana $semana, ?string $email, ?string $senha): void
     {
-        if ($semana->status !== StatusSemana::Agendada) {
+        $parcial = $semana->status === StatusSemana::AplicacaoParcial;
+
+        if (! $parcial && $semana->status !== StatusSemana::Agendada) {
             throw ValidationException::withMessages([
-                'semana' => 'Só uma semana agendada pode ser enviada para a fila de atendimento.',
+                'semana' => 'Só uma semana agendada ou com aplicação parcial pode ser enviada para a fila de atendimento.',
             ]);
         }
 
         // Aplicação sequencial: não passa a semana N com alguma anterior ainda agendada
-        if (! $semana->pode_ir_para_fila) {
+        if (! $parcial && ! $semana->pode_ir_para_fila) {
             throw ValidationException::withMessages([
                 'semana' => $semana->motivo_bloqueio_fila,
             ]);
@@ -194,7 +203,9 @@ class PrescricaoSemanaService
             PrescricaoLog::registrar(
                 $semana->prescricao_id,
                 TipoLogPrescricao::EnvioFila,
-                'Semana '.$semana->numero.' enviada para a fila de aplicação (parcela paga).',
+                $parcial
+                    ? 'Semana '.$semana->numero.' voltou para a fila de aplicação (paciente retornou, parcela paga).'
+                    : 'Semana '.$semana->numero.' enviada para a fila de aplicação (parcela paga).',
                 ['detalhes' => $semana->resumoParaLog()],
                 $semana->id
             );
@@ -242,6 +253,7 @@ class PrescricaoSemanaService
         }
 
         $atendimento = $semana->atendimentos()->create([
+            'chegada_em' => $semana->chegada_em ?? now(),
             'iniciado_em' => now(),
             'iniciado_por_user_id' => auth()->id(),
         ]);
@@ -387,6 +399,14 @@ class PrescricaoSemanaService
             return;
         }
 
+        // Medicamento controlado por vasilhame (miligrama): o saldo é em mg e
+        // vem de um vasilhame já aberto.
+        if ($item->eh_miligrama) {
+            $this->registrarItemMiligrama($atendimento, $semana, $item, $linha, $clinicaId);
+
+            return;
+        }
+
         $lote = $this->resolverLote($item, $linha['codigo_barras'] ?? null, $clinicaId);
 
         // A quantidade não é editável na tela: é a quantidade prescrita
@@ -456,6 +476,280 @@ class PrescricaoSemanaService
     }
 
     /**
+     * Aplicação de medicamento miligrama: quem tem saldo é o vasilhame aberto,
+     * em mg. A dose pode ser dividida em até DOIS vasilhames (o primeiro código
+     * informado é consumido primeiro).
+     *
+     * @param  array<string, mixed>  $linha
+     */
+    private function registrarItemMiligrama(
+        PrescricaoSemanaAtendimento $atendimento,
+        PrescricaoSemana $semana,
+        PrescricaoSemanaItem $item,
+        array $linha,
+        int $clinicaId
+    ): void {
+        $observacao = filled($linha['observacao'] ?? null) ? $linha['observacao'] : null;
+        $necessario = round((float) $item->quantidade_cobranca, 3);
+
+        if ($necessario <= 0) {
+            throw ValidationException::withMessages([
+                'itens' => 'A quantidade de '.$item->nome.' precisa ser maior que zero.',
+            ]);
+        }
+
+        $codigos = collect([$linha['codigo_barras'] ?? '', $linha['codigo_barras_2'] ?? ''])
+            ->map(fn ($codigo) => trim((string) $codigo))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($codigos->isEmpty()) {
+            throw ValidationException::withMessages([
+                'itens' => 'Informe o código de barras de '.$item->nome.'.',
+            ]);
+        }
+
+        $vasilhames = $codigos->map(fn (string $codigo) => $this->vasilhameParaAplicacao($item, $codigo, $clinicaId));
+
+        $aplicadoEm = $this->dataHora($linha['aplicado_em'] ?? null);
+
+        // Divisão montada na tela (modal dos 2 vasilhames): as quantidades vêm
+        // informadas; sem elas, o sistema distribui sozinho (1º depois o 2º).
+        $explicito = filled($linha['quantidade_1'] ?? null) || filled($linha['quantidade_2'] ?? null);
+
+        $plano = $explicito
+            ? $this->planoExplicito($item, $vasilhames, [
+                round($this->normalizarNumero($linha['quantidade_1'] ?? null), 3),
+                round($this->normalizarNumero($linha['quantidade_2'] ?? null), 3),
+            ], $necessario)
+            : $this->planoAutomatico($item, $vasilhames, $necessario);
+
+        foreach ($plano as $passo) {
+            $this->aplicarNoVasilhame(
+                $atendimento,
+                $semana,
+                $item,
+                $passo['vasilhame'],
+                $passo['mg'],
+                $aplicadoEm,
+                $observacao
+            );
+        }
+
+        $item->update([
+            'status' => StatusSemanaItem::Aplicado,
+            'observacao' => $observacao ?? $item->observacao,
+        ]);
+    }
+
+    /**
+     * Divisão automática: consome do 1º vasilhame o que der e o resto do 2º.
+     *
+     * @param  Collection<int, VasilhameAberto>  $vasilhames
+     * @return array<int, array{vasilhame: VasilhameAberto, mg: float}>
+     */
+    private function planoAutomatico(PrescricaoSemanaItem $item, Collection $vasilhames, float $necessario): array
+    {
+        $disponivel = round((float) $vasilhames->sum(fn (VasilhameAberto $v) => (float) $v->mg_restantes), 3);
+
+        if ($disponivel < $necessario) {
+            throw ValidationException::withMessages([
+                'itens' => 'Os vasilhames informados não têm a quantidade necessária de '.$item->nome
+                    .': precisa de '.Numero::formatar($necessario).' mg e há '
+                    .Numero::formatar($disponivel).' mg.',
+            ]);
+        }
+
+        $plano = [];
+        $falta = $necessario;
+
+        foreach ($vasilhames as $vasilhame) {
+            if ($falta <= 0) {
+                break;
+            }
+
+            $usar = round(min((float) $vasilhame->mg_restantes, $falta), 3);
+
+            if ($usar <= 0) {
+                continue;
+            }
+
+            $plano[] = ['vasilhame' => $vasilhame, 'mg' => $usar];
+            $falta = round($falta - $usar, 3);
+        }
+
+        return $plano;
+    }
+
+    /**
+     * Divisão informada na tela: cada vasilhame leva a quantidade escolhida e a
+     * soma precisa fechar exatamente a dose.
+     *
+     * @param  Collection<int, VasilhameAberto>  $vasilhames
+     * @param  array<int, float>  $quantidades
+     * @return array<int, array{vasilhame: VasilhameAberto, mg: float}>
+     */
+    private function planoExplicito(
+        PrescricaoSemanaItem $item,
+        Collection $vasilhames,
+        array $quantidades,
+        float $necessario
+    ): array {
+        if ($quantidades[1] > 0 && $vasilhames->count() < 2) {
+            throw ValidationException::withMessages([
+                'itens' => 'Informe o código do 2º vasilhame de '.$item->nome.'.',
+            ]);
+        }
+
+        if ($quantidades[0] <= 0) {
+            throw ValidationException::withMessages([
+                'itens' => 'Informe a quantidade que sai do 1º vasilhame de '.$item->nome.'.',
+            ]);
+        }
+
+        $soma = round($quantidades[0] + $quantidades[1], 3);
+
+        if (abs($soma - $necessario) > 0.001) {
+            throw ValidationException::withMessages([
+                'itens' => $soma < $necessario
+                    ? 'A soma dos vasilhames ('.Numero::formatar($soma).' mg) não fecha a dose de '
+                        .$item->nome.' ('.Numero::formatar($necessario).' mg).'
+                    : 'A soma dos vasilhames ('.Numero::formatar($soma).' mg) passa da dose de '
+                        .$item->nome.' ('.Numero::formatar($necessario).' mg).',
+            ]);
+        }
+
+        $plano = [];
+
+        foreach ($vasilhames as $indice => $vasilhame) {
+            $mg = $quantidades[$indice] ?? 0.0;
+
+            if ($mg <= 0) {
+                continue;
+            }
+
+            if ($mg > (float) $vasilhame->mg_restantes + 0.001) {
+                throw ValidationException::withMessages([
+                    'itens' => 'O '.($indice + 1).'º vasilhame de '.$item->nome.' tem apenas '
+                        .Numero::formatar($vasilhame->mg_restantes).' mg — não dá para usar '
+                        .Numero::formatar($mg).' mg.',
+                ]);
+            }
+
+            $plano[] = ['vasilhame' => $vasilhame, 'mg' => $mg];
+        }
+
+        return $plano;
+    }
+
+    /**
+     * Vasilhame ABERTO de um código de barras, pronto para receber aplicação.
+     * Vasilhame fechado (ou já esgotado) não entra.
+     */
+    private function vasilhameParaAplicacao(PrescricaoSemanaItem $item, string $codigo, int $clinicaId): VasilhameAberto
+    {
+        $lotes = EntradaItem::with('medicamento')
+            ->where('codigo_barras', $codigo)
+            ->whereHas('entrada')
+            ->get();
+
+        if ($lotes->isEmpty()) {
+            throw ValidationException::withMessages([
+                'itens' => 'Código de barras '.$codigo.' não encontrado.',
+            ]);
+        }
+
+        // Mesmo produto: vale o vasilhame do medicamento do item ou de outro do
+        // mesmo grupo (mesmo produto com tamanho de vasilhame diferente)
+        $permitidos = $item->medicamento?->idsDoMesmoProduto() ?? collect([$item->medicamento_id]);
+
+        $doMedicamento = $lotes->filter(fn (EntradaItem $lote) => $permitidos->contains((int) $lote->medicamento_id));
+
+        if ($doMedicamento->isEmpty()) {
+            throw ValidationException::withMessages([
+                'itens' => 'O código de barras '.$codigo.' é de '
+                    .($lotes->first()->medicamento?->nome ?? 'outro medicamento')
+                    .', que não é o mesmo produto de '.$item->nome.'.',
+            ]);
+        }
+
+        $lote = $doMedicamento->first();
+
+        if ($lote->esta_vencido) {
+            throw ValidationException::withMessages([
+                'itens' => 'O lote '.$lote->lote.' do código '.$codigo.' está vencido (venc. '
+                    .($lote->vencimento_formatado ?? '—').') e não pode ser aplicado.',
+            ]);
+        }
+
+        $vasilhame = $this->vasilhames->emUso($lote, $clinicaId);
+
+        if ($vasilhame) {
+            return $vasilhame;
+        }
+
+        $esgotado = $doMedicamento->contains(fn (EntradaItem $lote) => $lote->vasilhamesAbertos()
+            ->where('clinica_id', $clinicaId)
+            ->whereNotNull('esgotado_em')
+            ->exists());
+
+        throw ValidationException::withMessages([
+            'itens' => $esgotado
+                ? 'O vasilhame '.$codigo.' já foi esgotado e não pode mais ser usado.'
+                : 'O vasilhame '.$codigo.' está fechado — abra o vasilhame antes de aplicar '.$item->nome.'.',
+        ]);
+    }
+
+    /**
+     * Registra a aplicação em um vasilhame (quantidade em mg) e consome o saldo.
+     */
+    private function aplicarNoVasilhame(
+        PrescricaoSemanaAtendimento $atendimento,
+        PrescricaoSemana $semana,
+        PrescricaoSemanaItem $item,
+        VasilhameAberto $vasilhame,
+        float $mg,
+        Carbon $aplicadoEm,
+        ?string $observacao
+    ): void {
+        $lote = $vasilhame->entradaItem;
+
+        $atendimento->aplicacoes()->create([
+            'prescricao_semana_item_id' => $item->id,
+            'entrada_item_id' => $vasilhame->entrada_item_id,
+            'vasilhame_aberto_id' => $vasilhame->id,
+            'medicamento_id' => $vasilhame->medicamento_id,
+            'codigo_barras' => $lote?->codigo_barras,
+            'lote' => $lote?->lote,
+            'vencimento' => $lote?->vencimento,
+            'quantidade' => $mg,
+            'aplicado_em' => $aplicadoEm,
+            'user_id' => auth()->id(),
+            'observacao' => $observacao,
+        ]);
+
+        $this->vasilhames->consumir($vasilhame, $mg);
+
+        PrescricaoLog::registrar(
+            $semana->prescricao_id,
+            TipoLogPrescricao::Aplicacao,
+            $item->nome.' aplicado.',
+            ['detalhes' => array_filter([
+                'Medicamento' => $item->nome,
+                'Quantidade aplicada' => Numero::formatar($mg).' mg',
+                'Código de barras' => $lote?->codigo_barras,
+                'Lote' => $lote?->lote,
+                'Vencimento' => $lote?->vencimento_formatado,
+                'Vasilhame' => 'restam '.Numero::formatar($vasilhame->mg_restantes).' mg',
+                'Aplicado em' => $aplicadoEm->format('d/m/Y H:i'),
+                'Observação' => $observacao,
+            ])],
+            $semana->id
+        );
+    }
+
+    /**
      * Descobre de qual lote saiu a aplicação pelo código de barras: precisa ter
      * saldo na clínica, ser do medicamento do item e não estar vencido.
      */
@@ -488,7 +782,7 @@ class PrescricaoSemanaService
         }
 
         // Lote vencido não pode ser aplicado — se todos estiverem vencidos, para tudo.
-        $validos = $doItem->reject(fn (EntradaItem $lote) => $this->loteVencido($lote));
+        $validos = $doItem->reject(fn (EntradaItem $lote) => $lote->esta_vencido);
 
         if ($validos->isEmpty()) {
             $vencido = $doItem->first();
@@ -512,15 +806,6 @@ class PrescricaoSemanaService
         }
 
         return collect([$item->medicamento_id])->filter()->values();
-    }
-
-    /**
-     * O lote está vencido? (comparação por dia: vence no próprio dia vale)
-     */
-    private function loteVencido(EntradaItem $lote): bool
-    {
-        return $lote->vencimento !== null
-            && $lote->vencimento->copy()->startOfDay()->lt(now()->startOfDay());
     }
 
     /**

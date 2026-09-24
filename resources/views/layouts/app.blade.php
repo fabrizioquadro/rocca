@@ -233,6 +233,12 @@
                         </a>
                       </li>
                       <li class="menu-item">
+                        <a href="{{ route('estoque.baixas-abertos.index') }}" class="menu-link">
+                          <i class="menu-icon tf-icons ri-logout-box-r-line"></i>
+                          <div data-i18n="Baixa de Abertos">Baixa de Abertos</div>
+                        </a>
+                      </li>
+                      <li class="menu-item">
                         <a href="{{ route('estoque.transferencias.index') }}" class="menu-link">
                           <i class="menu-icon tf-icons ri-arrow-left-right-line"></i>
                           <div data-i18n="Transferências">Transferências</div>
@@ -261,6 +267,82 @@
                       <i class="menu-icon tf-icons ri-file-list-2-line"></i>
                       <div data-i18n="Prescrições">Prescrições</div>
                     </a>
+                  </li>
+
+                  <!-- Relatórios -->
+                  <li class="menu-item">
+                    <a href="javascript:void(0);" class="menu-link menu-toggle">
+                      <i class="menu-icon tf-icons ri-bar-chart-box-line"></i>
+                      <div data-i18n="Relatórios">Relatórios</div>
+                    </a>
+                    <ul class="menu-sub">
+                      <li class="menu-item">
+                        <a href="{{ route('relatorios.index') }}" class="menu-link">
+                          <i class="menu-icon tf-icons ri-list-check-2"></i>
+                          <div data-i18n="Todos os relatórios">Todos os relatórios</div>
+                        </a>
+                      </li>
+                      <li class="menu-item">
+                        <a href="{{ route('relatorios.aplicacoes') }}" class="menu-link">
+                          <i class="menu-icon tf-icons ri-syringe-line"></i>
+                          <div data-i18n="Aplicações">Aplicações</div>
+                        </a>
+                      </li>
+                      <li class="menu-item">
+                        <a href="{{ route('relatorios.aplicacoes-por-medicamento') }}" class="menu-link">
+                          <i class="menu-icon tf-icons ri-bar-chart-2-line"></i>
+                          <div data-i18n="Por medicamento">Por medicamento</div>
+                        </a>
+                      </li>
+                      <li class="menu-item">
+                        <a href="{{ route('relatorios.vasilhames-abertos') }}" class="menu-link">
+                          <i class="menu-icon tf-icons ri-archive-2-line"></i>
+                          <div data-i18n="Vasilhames abertos">Vasilhames abertos</div>
+                        </a>
+                      </li>
+                      <li class="menu-item">
+                        <a href="{{ route('relatorios.baixas-abertos') }}" class="menu-link">
+                          <i class="menu-icon tf-icons ri-logout-box-r-line"></i>
+                          <div data-i18n="Baixas de abertos">Baixas de abertos</div>
+                        </a>
+                      </li>
+                      <li class="menu-item">
+                        <a href="{{ route('relatorios.movimentacoes') }}" class="menu-link">
+                          <i class="menu-icon tf-icons ri-swap-box-line"></i>
+                          <div data-i18n="Movimentações">Movimentações</div>
+                        </a>
+                      </li>
+                      <li class="menu-item">
+                        <a href="{{ route('relatorios.posicao-estoque') }}" class="menu-link">
+                          <i class="menu-icon tf-icons ri-stack-line"></i>
+                          <div data-i18n="Posição de estoque">Posição de estoque</div>
+                        </a>
+                      </li>
+                      <li class="menu-item">
+                        <a href="{{ route('relatorios.itens-pendentes') }}" class="menu-link">
+                          <i class="menu-icon tf-icons ri-error-warning-line"></i>
+                          <div data-i18n="Itens pendentes">Itens pendentes</div>
+                        </a>
+                      </li>
+                      <li class="menu-item">
+                        <a href="{{ route('relatorios.contas-receber') }}" class="menu-link">
+                          <i class="menu-icon tf-icons ri-hand-coin-line"></i>
+                          <div data-i18n="Contas a receber">Contas a receber</div>
+                        </a>
+                      </li>
+                      <li class="menu-item">
+                        <a href="{{ route('relatorios.recebimentos') }}" class="menu-link">
+                          <i class="menu-icon tf-icons ri-money-dollar-circle-line"></i>
+                          <div data-i18n="Recebimentos">Recebimentos</div>
+                        </a>
+                      </li>
+                      <li class="menu-item">
+                        <a href="{{ route('relatorios.prescricoes') }}" class="menu-link">
+                          <i class="menu-icon tf-icons ri-file-list-2-line"></i>
+                          <div data-i18n="Prescrições">Prescrições</div>
+                        </a>
+                      </li>
+                    </ul>
                   </li>
                 </ul>
               </div>

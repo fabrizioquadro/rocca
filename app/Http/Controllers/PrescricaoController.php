@@ -169,6 +169,10 @@ class PrescricaoController extends Controller
             'financeiro.pagamentos.user',
         ]);
 
+        // Cada semana olha a prescrição para saber se pode ir para a fila
+        // (aplicação sequencial): sem isso seria uma consulta por linha.
+        $prescricao->semanas->each->setRelation('prescricao', $prescricao);
+
         return view('prescricoes.show', [
             'prescricao' => $prescricao,
             'formasPagamento' => FormaPagamento::opcoes(),

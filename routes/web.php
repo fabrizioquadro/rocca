@@ -7,6 +7,7 @@ use App\Http\Controllers\ClinicaController;
 use App\Http\Controllers\ComboController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EstoqueBaixaController;
+use App\Http\Controllers\EstoqueBaixaVasilhameController;
 use App\Http\Controllers\EstoqueBuscaController;
 use App\Http\Controllers\EstoqueEntradaController;
 use App\Http\Controllers\EstoqueSaldoController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\MedicamentoController;
 use App\Http\Controllers\PacienteController;
 use App\Http\Controllers\PrescricaoController;
 use App\Http\Controllers\PrescricaoSemanaController;
+use App\Http\Controllers\RelatorioController;
 use App\Http\Controllers\PerfilController;
 use App\Http\Controllers\UsuarioController;
 use Illuminate\Support\Facades\Route;
@@ -151,8 +153,18 @@ Route::middleware('auth')->group(function () {
         // Busca de código de barras (medicamento, lote, vencimento e saldo)
         Route::get('/codigo-barras', [EstoqueBuscaController::class, 'buscarCodigoBarras'])->name('buscarCodigoBarras');
 
+        // Situação do vasilhame (medicamento miligrama) para a tela de aplicação
+        Route::get('/vasilhame', [EstoqueBuscaController::class, 'buscarVasilhame'])->name('buscarVasilhame');
+
+        // Baixa de medicamentos ABERTOS (vasilhames em uso) — não tem exclusão
+        Route::get('/baixas-abertos', [EstoqueBaixaVasilhameController::class, 'index'])->name('baixas-abertos.index');
+        Route::get('/baixas-abertos/criar', [EstoqueBaixaVasilhameController::class, 'create'])->name('baixas-abertos.create');
+        Route::post('/baixas-abertos', [EstoqueBaixaVasilhameController::class, 'store'])->name('baixas-abertos.store');
+        Route::get('/baixas-abertos/{baixa_vasilhame}', [EstoqueBaixaVasilhameController::class, 'show'])->name('baixas-abertos.show');
+
         // Saldo de estoque (posição atual por medicamento, código de barras e lote)
         Route::get('/saldo', [EstoqueSaldoController::class, 'index'])->name('saldo.index');
+        Route::get('/inventario/{entrada_item}', [EstoqueSaldoController::class, 'inventario'])->name('saldo.inventario');
         Route::get('/saldo/{medicamento}', [EstoqueSaldoController::class, 'show'])->name('saldo.show');
     });
 
@@ -199,10 +211,33 @@ Route::middleware('auth')->group(function () {
     Route::get('/prescricoes/{prescricao}/semanas/{semana}/aplicar', [PrescricaoSemanaController::class, 'formAplicacao'])->name('prescricoes.semanas.aplicar.form');
     Route::post('/prescricoes/{prescricao}/semanas/{semana}/aplicar', [PrescricaoSemanaController::class, 'aplicar'])->name('prescricoes.semanas.aplicar');
 
+    // Abertura do vasilhame (medicamento miligrama) durante a aplicação
+    Route::post('/prescricoes/{prescricao}/semanas/{semana}/vasilhames', [PrescricaoSemanaController::class, 'abrirVasilhame'])->name('prescricoes.semanas.vasilhames.store');
+
     // Pagamentos do financeiro (alocados da 1ª para a última parcela)
     Route::post('/prescricoes/{prescricao}/pagamentos', [FinanceiroPagamentoController::class, 'store'])->name('prescricoes.pagamentos.store');
     Route::delete('/prescricoes/{prescricao}/pagamentos/{pagamento}', [FinanceiroPagamentoController::class, 'destroy'])->name('prescricoes.pagamentos.destroy');
 
     // Ajustes do financeiro (desconto, adicional e observação)
     Route::put('/prescricoes/{prescricao}/financeiro', [FinanceiroController::class, 'update'])->name('prescricoes.financeiro.update');
+
+    // Relatórios (estoque e vasilhames abertos, aplicações, pendências e financeiro).
+    // Cada relatório ganha também as rotas de exportação .pdf e .xlsx.
+    Route::prefix('relatorios')->name('relatorios.')->group(function () {
+        Route::get('/', [RelatorioController::class, 'index'])->name('index');
+
+        foreach (array_keys(RelatorioController::RELATORIOS) as $slug) {
+            Route::get("/{$slug}", [RelatorioController::class, 'exibir'])
+                ->name($slug)
+                ->defaults('relatorio', $slug);
+
+            Route::get("/{$slug}/pdf", [RelatorioController::class, 'pdf'])
+                ->name("{$slug}.pdf")
+                ->defaults('relatorio', $slug);
+
+            Route::get("/{$slug}/xlsx", [RelatorioController::class, 'xlsx'])
+                ->name("{$slug}.xlsx")
+                ->defaults('relatorio', $slug);
+        }
+    });
 });
