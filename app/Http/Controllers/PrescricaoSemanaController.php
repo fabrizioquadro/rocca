@@ -15,6 +15,7 @@ use App\Models\PrescricaoSemanaAtendimento;
 use App\Models\PrescricaoSemanaItem;
 use App\Models\VasilhameAberto;
 use App\Services\EstoqueVasilhameService;
+use App\Services\FeegowAplicacaoService;
 use App\Services\PrescricaoSemanaService;
 use App\Support\Numero;
 use Illuminate\Http\RedirectResponse;
@@ -63,7 +64,48 @@ class PrescricaoSemanaController extends Controller
             'semana' => $semana,
             'semanaAnterior' => $posicao > 0 ? $semanas->get($posicao - 1) : null,
             'semanaProxima' => $semanas->get($posicao + 1),
+            'feegow' => $this->registroDaFeegow($semana),
         ]);
+    }
+
+    /**
+     * Último envio da semana para a Feegow (se existir).
+     */
+    private function registroDaFeegow(PrescricaoSemana $semana)
+    {
+        return \App\Models\FeegowFila::where('prescricao_semana_id', $semana->id)
+            ->where('evento', 'aplicacao')
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * Registra (ou reenvia) a aplicação da semana na Feegow.
+     *
+     * Serve para reenviar o que ficou pendente/errado na fila e também para
+     * registrar aplicações feitas antes da integração existir.
+     */
+    public function registrarNaFeegow(Prescricao $prescricao, PrescricaoSemana $semana, FeegowAplicacaoService $feegow)
+    {
+        $this->garantirSemanaDaPrescricao($prescricao, $semana);
+
+        if (! $feegow->configurado()) {
+            return back()->with('error', 'A integração com a Feegow não está configurada (FEEGOW_TOKEN).');
+        }
+
+        try {
+            $registro = $feegow->registrarSemana($semana);
+        } catch (\Throwable $e) {
+            return back()->with('error', 'A Feegow recusou o envio: '.$e->getMessage());
+        }
+
+        if (! $registro) {
+            return back()->with('error', 'Não há atendimento finalizado nesta semana para registrar na Feegow.');
+        }
+
+        return back()->with('success', $registro->agendamento_id
+            ? 'Aplicação registrada na Feegow — agendamento #'.$registro->agendamento_id.'.'
+            : 'Aplicação enviada para a Feegow.');
     }
 
     /**

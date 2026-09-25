@@ -34,6 +34,15 @@ return [
     'feegow' => [
         'base_url' => env('FEEGOW_BASE_URL', 'https://api.feegow.com/v1/api'),
         'token' => env('FEEGOW_TOKEN'),
+        'timeout' => env('FEEGOW_TIMEOUT', 30),
+
+        // Agendamento da aplicação (appoints/new-appoint).
+        // Procedimento 13 = "Aplicação" na licença do Instituto Rocca.
+        'procedimento_aplicacao_id' => env('FEEGOW_PROCEDIMENTO_APLICACAO', 13),
+        // Local/agenda: 1 = Consultório Túlio, 2 = Consultório Breno, 3 = Consultório Ana.
+        'local_aplicacao_id' => env('FEEGOW_LOCAL_APLICACAO', 1),
+        'profissional_aplicacao_id' => env('FEEGOW_PROFISSIONAL_APLICACAO', 0),
+        'especialidade_aplicacao_id' => env('FEEGOW_ESPECIALIDADE_APLICACAO', 0),
     ],
 
 ];

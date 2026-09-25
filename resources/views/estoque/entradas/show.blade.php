@@ -32,6 +32,14 @@
             </div>
 
             <div class="ms-auto d-flex gap-2">
+              <a
+                href="{{ route('estoque.entradas.etiquetas', $entrada) }}"
+                class="btn btn-primary"
+                target="_blank"
+                title="Imprimir as etiquetas (código de barras) de todos os medicamentos desta entrada">
+                <i class="ri-printer-line me-1"></i>Imprimir Etiquetas
+              </a>
+
               <a href="{{ route('estoque.entradas.index') }}" class="btn btn-outline-secondary">
                 <i class="ri-arrow-left-line me-1"></i>Voltar
               </a>
@@ -154,7 +162,17 @@
               <tbody>
                 @forelse ($entrada->itens as $item)
                   <tr>
-                    <td>{{ $item->medicamento?->nome ?? '—' }}</td>
+                    <td>
+                      {{ $item->medicamento?->nome ?? '—' }}
+
+                      <a
+                        href="{{ route('estoque.entradas.itens.etiquetas', [$entrada, $item]) }}"
+                        class="text-body ms-1"
+                        target="_blank"
+                        title="Imprimir Etiquetas">
+                        <i class="ri-printer-line"></i>
+                      </a>
+                    </td>
                     <td>{{ $item->lote ?? '—' }}</td>
                     <td>{{ $item->codigo_barras ?? '—' }}</td>
                     <td>{{ $item->vencimento_formatado ?? '—' }}</td>

@@ -362,6 +362,11 @@ class PrescricaoSemanaService
             ]],
             $semana->id
         );
+
+        // Registra a aplicação como agendamento na Feegow. A integração nunca
+        // interrompe a aplicação: grava na fila, tenta enviar na hora e o que
+        // falhar fica pendente para o comando `feegow:fila` reenviar.
+        app(FeegowAplicacaoService::class)->registrar($atendimento);
     }
 
     /**

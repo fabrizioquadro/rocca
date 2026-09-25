@@ -12,7 +12,8 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        // Reenvia para a Feegow as aplicações que ainda não foram registradas.
+        $schedule->command('feegow:fila')->everyMinute()->withoutOverlapping();
     }
 
     /**

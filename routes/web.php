@@ -10,6 +10,7 @@ use App\Http\Controllers\EstoqueBaixaController;
 use App\Http\Controllers\EstoqueBaixaVasilhameController;
 use App\Http\Controllers\EstoqueBuscaController;
 use App\Http\Controllers\EstoqueEntradaController;
+use App\Http\Controllers\EstoqueEtiquetaController;
 use App\Http\Controllers\EstoqueSaldoController;
 use App\Http\Controllers\EstoqueTransferenciaController;
 use App\Http\Controllers\FinanceiroController;
@@ -132,6 +133,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/entradas/{entrada}', [EstoqueEntradaController::class, 'show'])->name('entradas.show');
         Route::delete('/entradas/{entrada}', [EstoqueEntradaController::class, 'destroy'])->name('entradas.destroy');
 
+        // Etiquetas (código de barras) da entrada — bobina 100mm, 3 etiquetas de 30x15mm por linha
+        Route::get('/entradas/{entrada}/etiquetas', [EstoqueEtiquetaController::class, 'entrada'])->name('entradas.etiquetas');
+        Route::get('/entradas/{entrada}/itens/{entrada_item}/etiquetas', [EstoqueEtiquetaController::class, 'item'])->name('entradas.itens.etiquetas');
+
         // Anexos da entrada (nota fiscal, recibo e etc.)
         Route::post('/entradas/{entrada}/anexos', [EstoqueEntradaController::class, 'storeAnexo'])->name('entradas.anexos.store');
         Route::delete('/entradas/{entrada}/anexos/{anexo}', [EstoqueEntradaController::class, 'destroyAnexo'])->name('entradas.anexos.destroy');
@@ -197,6 +202,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/prescricoes/{prescricao}/semanas/{semana}/editar', [PrescricaoSemanaController::class, 'edit'])->name('prescricoes.semanas.edit');
     Route::put('/prescricoes/{prescricao}/semanas/{semana}', [PrescricaoSemanaController::class, 'update'])->name('prescricoes.semanas.update');
     Route::delete('/prescricoes/{prescricao}/semanas/{semana}', [PrescricaoSemanaController::class, 'destroy'])->name('prescricoes.semanas.destroy');
+
+    // Registro/reenvio da aplicação da semana como agendamento na Feegow
+    Route::post('/prescricoes/{prescricao}/semanas/{semana}/feegow', [PrescricaoSemanaController::class, 'registrarNaFeegow'])->name('prescricoes.semanas.feegow');
 
     // Envio da semana para a fila de atendimento (exige parcela paga ou autorização de administrador)
     Route::post('/prescricoes/{prescricao}/semanas/{semana}/fila-atendimento', [PrescricaoSemanaController::class, 'enviarParaFila'])->name('prescricoes.semanas.fila');

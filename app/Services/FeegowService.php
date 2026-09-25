@@ -55,6 +55,79 @@ class FeegowService
     }
 
     /**
+     * Executa um POST na Feegow e devolve o corpo decodificado.
+     *
+     * A API dos agendamentos recebe os parâmetros na query string (e aceita
+     * também no corpo): mandamos nos dois para não depender da versão da API.
+     *
+     * @throws RuntimeException
+     */
+    public function post(string $endpoint, array $parametros = []): array
+    {
+        if (! $this->configurado()) {
+            throw new RuntimeException('Integração com a Feegow não está configurada (FEEGOW_BASE_URL / FEEGOW_TOKEN).');
+        }
+
+        $url = $this->baseUrl.'/'.ltrim($endpoint, '/').'?'.http_build_query($parametros);
+
+        $resposta = Http::withHeaders([
+            'X-Access-Token' => $this->token,
+            'Content-Type' => 'application/json',
+        ])
+            ->timeout((int) config('services.feegow.timeout', 30))
+            ->connectTimeout(15)
+            ->post($url, $parametros);
+
+        if (! $resposta->successful()) {
+            throw new RuntimeException(
+                'HTTP '.$resposta->status().' — '.mb_substr(trim($resposta->body()), 0, 300)
+            );
+        }
+
+        $corpo = $resposta->json();
+
+        return is_array($corpo) ? $corpo : [];
+    }
+
+    /**
+     * Garante que a Feegow respondeu com sucesso e devolve o "content".
+     *
+     * @throws RuntimeException
+     */
+    public function exigirSucesso(array $retorno, string $contexto): array
+    {
+        if (! ($retorno['success'] ?? false)) {
+            $mensagem = $retorno['message'] ?? ($retorno['error'] ?? 'resposta sem sucesso');
+
+            throw new RuntimeException($contexto.': '.(is_array($mensagem) ? json_encode($mensagem) : $mensagem));
+        }
+
+        $conteudo = $retorno['content'] ?? [];
+
+        return is_array($conteudo) ? $conteudo : [];
+    }
+
+    /**
+     * Lista os locais (agendas) disponíveis na licença.
+     */
+    public function listarLocais(): array
+    {
+        $retorno = $this->get('company/list-local');
+
+        return $retorno['content'] ?? [];
+    }
+
+    /**
+     * Lista os procedimentos disponíveis na licença.
+     */
+    public function listarProcedimentos(): array
+    {
+        $retorno = $this->get('procedures/list');
+
+        return $retorno['content'] ?? [];
+    }
+
+    /**
      * Lista todos os pacientes da Feegow (percorrendo a paginação).
      */
     public function listarPacientes(int $limitePorPagina = 500, int $maximoPaginas = 200): array

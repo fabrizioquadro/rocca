@@ -25,6 +25,8 @@ enum TipoLogPrescricao: string
     case AnexoRemovido = 'anexo_removido';
     case Observacao = 'observacao';
     case Exclusao = 'exclusao';
+    case FeegowEnviado = 'feegow_enviado';
+    case FeegowErro = 'feegow_erro';
 
     public function label(): string
     {
@@ -47,6 +49,8 @@ enum TipoLogPrescricao: string
             self::AnexoRemovido => 'Anexo removido',
             self::Observacao => 'Observação registrada',
             self::Exclusao => 'Prescrição excluída',
+            self::FeegowEnviado => 'Registrado na Feegow',
+            self::FeegowErro => 'Erro no envio para a Feegow',
         };
     }
 
@@ -60,7 +64,8 @@ enum TipoLogPrescricao: string
             self::Aplicacao, self::PagamentoRegistrado, self::AtendimentoFinalizado => 'bg-label-success',
             self::SemanaEditada, self::FinanceiroAjustado, self::ItemPendente => 'bg-label-warning',
             self::SemanaExcluida, self::Exclusao, self::PagamentoRemovido, self::AnexoRemovido => 'bg-label-danger',
-            self::EnvioFila, self::AtendimentoIniciado, self::VasilhameAberto => 'bg-label-info',
+            self::EnvioFila, self::AtendimentoIniciado, self::VasilhameAberto, self::FeegowEnviado => 'bg-label-info',
+            self::FeegowErro => 'bg-label-danger',
             self::Devolucao => 'bg-label-secondary',
         };
     }
@@ -88,6 +93,8 @@ enum TipoLogPrescricao: string
             self::AnexoEnviado => 'ri-attachment-2',
             self::AnexoRemovido => 'ri-attachment-2',
             self::Observacao => 'ri-chat-1-line',
+            self::FeegowEnviado => 'ri-cloud-line',
+            self::FeegowErro => 'ri-cloud-off-line',
         };
     }
 

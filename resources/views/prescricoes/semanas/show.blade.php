@@ -344,6 +344,55 @@
             <span>{{ $semana->observacao }}</span>
           </div>
         @endif
+
+        {{-- Registro da aplicação na Feegow (agendamento) --}}
+        @if ($semana->atendimentos->isNotEmpty())
+          <div class="col-12">
+            <div class="border rounded p-4">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                  <small class="text-muted d-block mb-2">Feegow (agendamento da aplicação)</small>
+
+                  @if ($feegow)
+                    <span class="badge {{ $feegow->situacao_cor }}">{{ $feegow->situacao_label }}</span>
+
+                    @if ($feegow->agendamento_id)
+                      <span class="text-body-secondary ms-1">agendamento #{{ $feegow->agendamento_id }}</span>
+                    @endif
+
+                    @if ($feegow->enviado_em)
+                      <small class="text-body-secondary d-block">
+                        Registrado em {{ $feegow->enviado_em->format('d/m/Y H:i') }}
+                      </small>
+                    @elseif ($feegow->proxima_tentativa)
+                      <small class="text-body-secondary d-block">
+                        Próxima tentativa em {{ $feegow->proxima_tentativa->format('d/m/Y H:i') }}
+                      </small>
+                    @endif
+
+                    @if ($feegow->erro)
+                      <small class="text-danger d-block">Último erro: {{ $feegow->erro }}</small>
+                    @endif
+                  @else
+                    <span class="text-muted">Esta aplicação ainda não foi registrada na Feegow.</span>
+                  @endif
+                </div>
+
+                <form method="POST" action="{{ route('prescricoes.semanas.feegow', [$prescricao, $semana]) }}">
+                  @csrf
+
+                  <button
+                    type="submit"
+                    class="btn btn-sm btn-outline-primary"
+                    title="Registra a aplicação desta semana como agendamento na Feegow">
+                    <i class="ri-cloud-line me-1"></i>
+                    {{ $feegow ? ($feegow->enviado ? 'Enviar novamente' : 'Reenviar para a Feegow') : 'Registrar na Feegow' }}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        @endif
       </div>
     </div>
   </div>
