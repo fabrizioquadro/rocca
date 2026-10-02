@@ -25,7 +25,8 @@
       </div>
 
       <div class="d-flex flex-wrap gap-2">
-        {{-- Aplicação da semana: exige parcela paga ou liberação de administrador --}}
+        {{-- Aplicação da semana: parcela paga (ou semana sem cobrança) entra direto;
+             com parcela em aberto, precisa da liberação de um administrador --}}
         @if ($agendada)
           {{-- Aplicação sequencial: semana anterior pendente bloqueia o envio --}}
           @if (! $semana->pode_ir_para_fila)
@@ -35,7 +36,7 @@
                 <i class="ri-lock-line me-1"></i>Enviar para Fila de Atendimento
               </button>
             </span>
-          @elseif ($parcela?->esta_paga)
+          @elseif ($semana->pagamento_liberado)
             <form
               method="POST"
               action="{{ route('prescricoes.semanas.fila', [$prescricao, $semana]) }}"
@@ -154,8 +155,8 @@
       </div>
     @endif
 
-    {{-- Sem parcela paga: liberação com email e senha de um administrador --}}
-    @if ($agendada && $semana->pode_ir_para_fila && ! $parcela?->esta_paga)
+    {{-- Com parcela em aberto: liberação com email e senha de um administrador --}}
+    @if ($agendada && $semana->pode_ir_para_fila && ! $semana->pagamento_liberado)
       <div class="collapse {{ $errors->has('liberacao') || $errors->has('liberacao_email') ? 'show' : '' }}" id="painel-fila">
         <div class="card-body pt-0">
           <div class="border rounded p-4">

@@ -129,6 +129,36 @@ class Medicamento extends Model
     }
 
     /**
+     * Saldo atual em unidades usado na conferência dos níveis de estoque.
+     * Aproveita o `saldo` carregado por withSum (evita uma consulta por
+     * medicamento) e, quando ele não veio, soma as movimentações.
+     */
+    public function getSaldoAtualAttribute(): int
+    {
+        return (int) round((float) ($this->attributes['saldo'] ?? $this->estoque_atual));
+    }
+
+    /**
+     * Nível do estoque em relação ao mínimo/médio cadastrados:
+     * 'minimo' (abaixo do mínimo), 'medio' (abaixo do médio) ou null
+     * (normal ou medicamento sem nível cadastrado).
+     */
+    public function getNivelEstoqueAttribute(): ?string
+    {
+        $saldo = $this->saldo_atual;
+
+        if ($this->estoque_minimo !== null && $saldo < (int) $this->estoque_minimo) {
+            return 'minimo';
+        }
+
+        if ($this->estoque_medio !== null && $saldo < (int) $this->estoque_medio) {
+            return 'medio';
+        }
+
+        return null;
+    }
+
+    /**
      * Saldo do estoque em uma clínica específica
      * (null = todas as clínicas).
      */

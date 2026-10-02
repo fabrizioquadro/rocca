@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\ClinicaController;
 use App\Http\Controllers\ComboController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EnfermagemController;
 use App\Http\Controllers\EstoqueBaixaController;
 use App\Http\Controllers\EstoqueBaixaVasilhameController;
 use App\Http\Controllers\EstoqueBuscaController;
@@ -22,6 +23,7 @@ use App\Http\Controllers\PacienteController;
 use App\Http\Controllers\PrescricaoController;
 use App\Http\Controllers\PrescricaoSemanaController;
 use App\Http\Controllers\RelatorioController;
+use App\Http\Controllers\SecretariaController;
 use App\Http\Controllers\PerfilController;
 use App\Http\Controllers\UsuarioController;
 use Illuminate\Support\Facades\Route;
@@ -69,6 +71,10 @@ Route::post('/logout', [LoginController::class, 'logout'])
 
 // Área logada
 Route::middleware('auth')->group(function () {
+    // Áreas operacionais por perfil (páginas iniciais; conteúdo a definir)
+    Route::get('/secretaria', [SecretariaController::class, 'index'])->name('secretaria.index');
+    Route::get('/enfermagem', [EnfermagemController::class, 'index'])->name('enfermagem.index');
+
     // Perfil do usuário logado
     Route::get('/perfil', [PerfilController::class, 'edit'])->name('perfil.edit');
     Route::put('/perfil', [PerfilController::class, 'update'])->name('perfil.update');

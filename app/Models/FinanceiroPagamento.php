@@ -26,6 +26,7 @@ class FinanceiroPagamento extends Model
     protected $fillable = [
         'financeiro_id',
         'valor',
+        'identificador',
         'forma_pagamento',
         'parcelas',
         'data_pagamento',
@@ -83,6 +84,15 @@ class FinanceiroPagamento extends Model
     public function getFormaLabelAttribute(): string
     {
         return $this->forma_pagamento?->label() ?? '—';
+    }
+
+    /**
+     * Identificador da transação (NSU/autorização, ID do Pix...) ou "—".
+     * É o número que sai no comprovante e serve para a conciliação.
+     */
+    public function getIdentificadorLabelAttribute(): string
+    {
+        return filled($this->identificador) ? (string) $this->identificador : '—';
     }
 
     /**

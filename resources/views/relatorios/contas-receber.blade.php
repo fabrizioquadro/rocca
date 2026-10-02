@@ -54,6 +54,7 @@
               <th style="width: 90px;">Parcela</th>
               <th style="width: 110px;" class="text-end">Valor</th>
               <th style="width: 110px;" class="text-end">Pago</th>
+              <th style="width: 140px;">ID recebimento</th>
               <th style="width: 120px;" class="text-end">Em aberto</th>
               <th style="width: 100px;">Status</th>
             </tr>
@@ -77,6 +78,7 @@
                 <td>{{ $parcela->numero_formatado }}</td>
                 <td class="text-end">{{ $parcela->valor_formatado }}</td>
                 <td class="text-end">{{ $parcela->valor_pago_formatado }}</td>
+                <td class="small text-body-secondary">{{ $idsPorParcela[$parcela->id] ?? '—' }}</td>
                 <td class="text-end fw-semibold">{{ $parcela->valor_em_aberto_formatado }}</td>
                 <td>
                   <span class="badge {{ $parcela->status?->corBadge() ?? 'bg-label-secondary' }}">
@@ -88,12 +90,12 @@
           </tbody>
           <tfoot>
             <tr>
-              <th colspan="8" class="text-end">Total em aberto</th>
+              <th colspan="9" class="text-end">Total em aberto</th>
               <th class="text-end">R$ {{ number_format($totalAberto, 2, ',', '.') }}</th>
               <th></th>
             </tr>
             <tr>
-              <th colspan="8" class="text-end">Do total, vencido</th>
+              <th colspan="9" class="text-end">Do total, vencido</th>
               <th class="text-end text-danger">R$ {{ number_format($totalVencido, 2, ',', '.') }}</th>
               <th></th>
             </tr>

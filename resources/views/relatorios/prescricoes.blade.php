@@ -62,6 +62,7 @@
               <th style="width: 110px;" class="text-end">Total</th>
               <th style="width: 110px;" class="text-end">Recebido</th>
               <th style="width: 110px;" class="text-end">Em aberto</th>
+              <th style="min-width: 140px;">Recebimentos (ID)</th>
             </tr>
           </thead>
           <tbody>
@@ -82,6 +83,11 @@
                 <td class="text-end fw-semibold">{{ $prescricao->financeiro?->valor_total_formatado ?? '—' }}</td>
                 <td class="text-end">{{ $prescricao->financeiro?->valor_recebido_formatado ?? '—' }}</td>
                 <td class="text-end">{{ $prescricao->financeiro?->valor_aberto_formatado ?? '—' }}</td>
+                @php
+                  $identificadores = $prescricao->financeiro?->pagamentos
+                    ?->pluck('identificador')->filter()->unique()->implode(', ');
+                @endphp
+                <td class="small text-body-secondary">{{ filled($identificadores) ? $identificadores : '—' }}</td>
               </tr>
             @endforeach
           </tbody>
@@ -94,6 +100,7 @@
               <th class="text-end">R$ {{ number_format($totais['total'], 2, ',', '.') }}</th>
               <th class="text-end">R$ {{ number_format($totais['recebido'], 2, ',', '.') }}</th>
               <th class="text-end">R$ {{ number_format($totais['aberto'], 2, ',', '.') }}</th>
+              <th></th>
             </tr>
           </tfoot>
         </table>

@@ -170,6 +170,10 @@ class PrescricaoSemanaService
      * estar paga. Sem o pagamento, só é liberado com a autorização de um
      * administrador (email + senha), e fica gravado quem liberou e quando.
      *
+     * Exceção: semana SEM nada a cobrar (sem parcela ou parcela de valor zero,
+     * como um procedimento sem custo) não precisa de autorização nenhuma — não
+     * existe pagamento a exigir.
+     *
      * A semana com aplicação parcial também entra: o paciente voltou para
      * completar a aplicação. Nesse caso a regra sequencial não se aplica (a
      * semana já saiu do agendamento muito antes).
@@ -191,10 +195,11 @@ class PrescricaoSemanaService
             ]);
         }
 
-        $parcela = $semana->parcelas()->first();
+        // Parcela paga ou nada a cobrar (semana sem valor): segue direto, sem
+        // autorização de administrador
+        if ($semana->pagamento_liberado) {
+            $motivo = $semana->sem_cobranca ? 'sem valor a receber' : 'parcela paga';
 
-        // Parcela paga: segue direto, sem autorização
-        if ($parcela && $parcela->esta_paga) {
             $semana->update([
                 'status' => StatusSemana::FilaAplicacao,
                 'chegada_em' => now(),
@@ -204,8 +209,8 @@ class PrescricaoSemanaService
                 $semana->prescricao_id,
                 TipoLogPrescricao::EnvioFila,
                 $parcial
-                    ? 'Semana '.$semana->numero.' voltou para a fila de aplicação (paciente retornou, parcela paga).'
-                    : 'Semana '.$semana->numero.' enviada para a fila de aplicação (parcela paga).',
+                    ? 'Semana '.$semana->numero.' voltou para a fila de aplicação (paciente retornou, '.$motivo.').'
+                    : 'Semana '.$semana->numero.' enviada para a fila de aplicação ('.$motivo.').',
                 ['detalhes' => $semana->resumoParaLog()],
                 $semana->id
             );
@@ -412,6 +417,14 @@ class PrescricaoSemanaService
             return;
         }
 
+        // Procedimento (Bioimpedância, Coleta...): não tem lote nem código de
+        // barras e não movimenta estoque — só a observação.
+        if ($item->eh_procedimento) {
+            $this->registrarItemProcedimento($atendimento, $semana, $item, $linha);
+
+            return;
+        }
+
         $lote = $this->resolverLote($item, $linha['codigo_barras'] ?? null, $clinicaId);
 
         // A quantidade não é editável na tela: é a quantidade prescrita
@@ -474,6 +487,56 @@ class PrescricaoSemanaService
                 'Vencimento' => $lote->vencimento_formatado,
                 'Aplicado em' => $aplicadoEm->format('d/m/Y H:i'),
                 'Baixa no estoque' => (string) $quantidade.' unidade(s) na clínica',
+                'Observação' => $observacao,
+            ])],
+            $semana->id
+        );
+    }
+
+    /**
+     * Procedimento (Bioimpedância, Coleta...): registra a aplicação com o
+     * horário e a observação, SEM código de barras, lote e baixa de estoque —
+     * procedimento não sai do estoque de medicamentos.
+     *
+     * @param  array<string, mixed>  $linha
+     */
+    private function registrarItemProcedimento(
+        PrescricaoSemanaAtendimento $atendimento,
+        PrescricaoSemana $semana,
+        PrescricaoSemanaItem $item,
+        array $linha
+    ): void {
+        $observacao = filled($linha['observacao'] ?? null) ? $linha['observacao'] : null;
+        $aplicadoEm = $this->dataHora($linha['aplicado_em'] ?? null);
+
+        // Sem quantidade: não é unidade nem mg de estoque (aparece como "—"
+        // nos relatórios de aplicação)
+        $atendimento->aplicacoes()->create([
+            'prescricao_semana_item_id' => $item->id,
+            'entrada_item_id' => null,
+            'medicamento_id' => $item->medicamento_id,
+            'codigo_barras' => null,
+            'lote' => null,
+            'vencimento' => null,
+            'quantidade' => null,
+            'aplicado_em' => $aplicadoEm,
+            'user_id' => auth()->id(),
+            'observacao' => $observacao,
+        ]);
+
+        $item->update([
+            'status' => StatusSemanaItem::Aplicado,
+            'observacao' => $observacao ?? $item->observacao,
+        ]);
+
+        PrescricaoLog::registrar(
+            $semana->prescricao_id,
+            TipoLogPrescricao::Aplicacao,
+            $item->nome.' aplicado (procedimento, sem lote/estoque).',
+            ['detalhes' => array_filter([
+                'Procedimento' => $item->nome,
+                'Quantidade prevista' => $item->quantidade_formatada,
+                'Aplicado em' => $aplicadoEm->format('d/m/Y H:i'),
                 'Observação' => $observacao,
             ])],
             $semana->id

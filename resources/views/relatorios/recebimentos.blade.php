@@ -46,6 +46,7 @@
               <th style="width: 90px;">Prescrição</th>
               <th style="width: 150px;">Clínica</th>
               <th style="width: 150px;">Forma de pagamento</th>
+              <th style="width: 140px;">ID</th>
               <th style="width: 120px;" class="text-end">Valor</th>
               <th style="min-width: 150px;">Usuário</th>
               <th style="min-width: 160px;">Observação</th>
@@ -59,6 +60,7 @@
                 <td>#{{ $pagamento->financeiro?->prescricao_id ?? '—' }}</td>
                 <td>{{ $pagamento->financeiro?->clinica?->nome ?? '—' }}</td>
                 <td>{{ $pagamento->forma_descricao }}</td>
+                <td class="small text-body-secondary">{{ $pagamento->identificador_label }}</td>
                 <td class="text-end fw-semibold">{{ $pagamento->valor_formatado }}</td>
                 <td>{{ $pagamento->user?->nome ?? '—' }}</td>
                 <td class="small text-body-secondary">{{ $pagamento->observacao ?? '—' }}</td>
@@ -67,7 +69,7 @@
           </tbody>
           <tfoot>
             <tr>
-              <th colspan="5" class="text-end">Total recebido</th>
+              <th colspan="6" class="text-end">Total recebido</th>
               <th class="text-end">R$ {{ number_format($totalRecebido, 2, ',', '.') }}</th>
               <th colspan="2"></th>
             </tr>

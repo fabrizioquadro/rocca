@@ -411,6 +411,18 @@
           $temDesconto = $financeiro->valor_desconto > 0;
           $temAdicional = (float) $financeiro->adicional_valor > 0;
           $temAjustes = $temDesconto || $temAdicional;
+
+          // IDs dos recebimentos que caíram em cada parcela (mesma cascata do service)
+          $idsPorParcela = collect(\App\Services\FinanceiroPagamentoService::recebimentosPorParcela(
+            $financeiro->pagamentos,
+            $financeiro->parcelas
+          ))
+            ->map(fn ($recebimentos) => collect($recebimentos)
+              ->pluck('identificador')
+              ->map(fn ($identificador) => filled($identificador) ? $identificador : 'sem ID')
+              ->unique()
+              ->implode(', ') ?: null)
+            ->all();
         @endphp
 
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
@@ -588,6 +600,21 @@
             </div>
 
             <div class="col-md-3">
+              <label class="form-label" for="pagamento_identificador">ID</label>
+              <input
+                type="text"
+                id="pagamento_identificador"
+                name="identificador"
+                class="form-control @error('identificador') is-invalid @enderror"
+                maxlength="100"
+                placeholder="Ex.: NSU/autorização da maquininha"
+                value="{{ old('identificador') }}" />
+              @error('identificador')
+                <div class="invalid-feedback">{{ $message }}</div>
+              @enderror
+            </div>
+
+            <div class="col-md-12">
               <label class="form-label" for="pagamento_observacao">Observação</label>
               <input
                 type="text"
@@ -603,7 +630,9 @@
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
             <small class="text-muted">
               O valor é alocado sempre da 1ª parcela para a última: a primeira é quitada e o que sobrar vai para a seguinte.
-              Parcelas com recebimento parcial ficam como <strong>Parcial</strong>.
+              Parcelas com recebimento parcial ficam como <strong>Parcial</strong>.<br />
+              O <strong>ID</strong> é o identificador da transação que sai no comprovante (NSU, autorização, ID/E2E do Pix)
+              e serve para a conciliação.
             </small>
 
             <button type="submit" class="btn btn-primary">
@@ -624,6 +653,8 @@
                 <th style="width: 130px;" class="text-end {{ $temAdicional ? '' : 'd-none' }}">Adicional</th>
                 <th style="width: 130px;" class="text-end">Valor</th>
                 <th style="width: 130px;" class="text-end">Pago</th>
+                <th style="width: 130px;" class="text-end">Aberto</th>
+                <th style="min-width: 140px;">ID do recebimento</th>
                 <th style="width: 110px;">Status</th>
               </tr>
             </thead>
@@ -646,6 +677,10 @@
                   <td class="text-end {{ (float) $parcela->valor_pago > 0 ? 'text-success' : 'text-muted' }}">
                     {{ (float) $parcela->valor_pago > 0 ? $parcela->valor_pago_formatado : '—' }}
                   </td>
+                  <td class="text-end {{ $parcela->valor_em_aberto > 0 ? 'text-danger' : 'text-muted' }}">
+                    {{ $parcela->valor_em_aberto > 0 ? $parcela->valor_em_aberto_formatado : '—' }}
+                  </td>
+                  <td class="small text-body-secondary">{{ $idsPorParcela[$parcela->id] ?? '—' }}</td>
                   <td>
                     <span class="badge {{ $parcela->status->corBadge() }}">{{ $parcela->status->label() }}</span>
                   </td>
@@ -664,6 +699,8 @@
                 </th>
                 <th class="text-end">{{ $financeiro->valor_total_formatado }}</th>
                 <th class="text-end text-success">{{ $financeiro->valor_pago_formatado }}</th>
+                <th class="text-end text-danger">{{ $financeiro->valor_aberto_formatado }}</th>
+                <th></th>
                 <th></th>
               </tr>
             </tfoot>
@@ -697,6 +734,7 @@
                   <th style="width: 130px;">Data</th>
                   <th style="width: 160px;" class="text-end">Valor</th>
                   <th style="width: 190px;">Forma</th>
+                  <th style="width: 150px;">ID</th>
                   <th>Observação</th>
                   <th style="width: 190px;">Registrado por</th>
                   <th style="width: 70px;" class="text-center"></th>
@@ -716,6 +754,7 @@
                         <span class="text-muted">—</span>
                       @endif
                     </td>
+                    <td class="text-body-secondary">{{ $pagamento->identificador_label }}</td>
                     <td class="text-muted">{{ $pagamento->observacao ?? '—' }}</td>
                     <td class="text-muted">{{ $pagamento->user?->nome ?? '—' }}</td>
                     <td class="text-center">
@@ -737,7 +776,7 @@
                 <tr>
                   <th class="text-end">Recebido</th>
                   <th class="text-end">{{ $financeiro->valor_recebido_formatado }}</th>
-                  <th colspan="4"></th>
+                  <th colspan="5"></th>
                 </tr>
               </tfoot>
             </table>

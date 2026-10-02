@@ -276,14 +276,35 @@ class PrescricaoSemana extends Model
     }
 
     /**
+     * A semana não tem nada a cobrar? Parcela não gerada (semana sem valor) ou
+     * parcela de valor zero — ex.: procedimento sem custo (Bioimpedância).
+     */
+    public function getSemCobrancaAttribute(): bool
+    {
+        $parcela = $this->parcelas->first();
+
+        return ! $parcela || (float) $parcela->valor <= 0;
+    }
+
+    /**
+     * O pagamento não impede a fila de aplicação: a parcela está paga ou não há
+     * nada a pagar. Quando é false, o envio exige a liberação de um
+     * administrador (email + senha).
+     */
+    public function getPagamentoLiberadoAttribute(): bool
+    {
+        return $this->sem_cobranca || (bool) $this->parcelas->first()?->esta_paga;
+    }
+
+    /**
      * A listagem de semanas oferece "Enviar para Fila de Aplicação"? Só para
-     * semana paga que ainda não entrou no fluxo: "Agendada" ou com aplicação
-     * parcial (a volta do paciente).
+     * semana paga (ou sem nada a pagar) que ainda não entrou no fluxo:
+     * "Agendada" ou com aplicação parcial (a volta do paciente).
      */
     private function envioParaFilaNoMenu(): bool
     {
         return in_array($this->status, [StatusSemana::Agendada, StatusSemana::AplicacaoParcial], true)
-            && (bool) $this->parcelas->first()?->esta_paga;
+            && $this->pagamento_liberado;
     }
 
     /**

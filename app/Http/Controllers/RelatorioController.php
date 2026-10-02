@@ -16,6 +16,7 @@ use App\Models\Prescricao;
 use App\Models\PrescricaoSemanaAplicacao;
 use App\Models\PrescricaoSemanaItem;
 use App\Models\VasilhameAberto;
+use App\Services\FinanceiroPagamentoService;
 use App\Services\RelatorioExportacaoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -381,7 +382,7 @@ class RelatorioController extends Controller
         $somenteVencidas = $request->boolean('vencidas');
 
         $parcelas = FinanceiroParcela::query()
-            ->with(['semana.prescricao.paciente', 'semana.prescricao.clinica', 'financeiro'])
+            ->with(['semana.prescricao.paciente', 'semana.prescricao.clinica', 'financeiro.parcelas', 'financeiro.pagamentos'])
             ->whereIn('status', [StatusParcela::Aberta->value, StatusParcela::Parcial->value])
             ->whereBetween('vencimento', [$inicio->toDateString(), $fim->toDateString()])
             ->when($clinicaId, fn ($query) => $query->whereHas(
@@ -392,6 +393,23 @@ class RelatorioController extends Controller
             ->orderBy('vencimento')
             ->get();
 
+        // ID de cada recebimento que já caiu na parcela (mesma cascata do service)
+        $idsPorParcela = [];
+
+        foreach ($parcelas->pluck('financeiro')->filter()->unique('id') as $financeiro) {
+            foreach (FinanceiroPagamentoService::recebimentosPorParcela($financeiro->pagamentos, $financeiro->parcelas) as $parcelaId => $recebimentos) {
+                $ids = collect($recebimentos)
+                    ->pluck('identificador')
+                    ->map(fn ($identificador) => filled($identificador) ? $identificador : 'sem ID')
+                    ->unique()
+                    ->implode(', ');
+
+                if ($ids !== '') {
+                    $idsPorParcela[$parcelaId] = $ids;
+                }
+            }
+        }
+
         $totalAberto = round((float) $parcelas->sum(fn ($parcela) => $parcela->valor_em_aberto), 2);
         $totalVencido = round(
             (float) $parcelas->filter(fn ($parcela) => $parcela->vencimento?->lt(now()->startOfDay()))
@@ -401,7 +419,7 @@ class RelatorioController extends Controller
 
         return view('relatorios.contas-receber', array_merge(
             $this->dadosComuns($request),
-            compact('parcelas', 'totalAberto', 'totalVencido', 'somenteVencidas')
+            compact('parcelas', 'totalAberto', 'totalVencido', 'somenteVencidas', 'idsPorParcela')
         ));
     }
 
@@ -445,7 +463,7 @@ class RelatorioController extends Controller
         $clinicaId = (int) $request->input('clinica_id');
 
         $prescricoes = Prescricao::query()
-            ->with(['paciente', 'clinica', 'financeiro'])
+            ->with(['paciente', 'clinica', 'financeiro.pagamentos'])
             ->whereBetween('created_at', [$inicio, $fim])
             ->when($clinicaId, fn ($query) => $query->where('clinica_id', $clinicaId))
             ->orderByDesc('id')

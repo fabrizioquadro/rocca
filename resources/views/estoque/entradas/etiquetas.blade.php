@@ -7,10 +7,16 @@
   <style>
     /* ============================================================
        Bobina: 100mm de largura, 3 etiquetas de 30x15mm por linha.
-       Espaçamento: 3mm entre as colunas, 3mm entre as linhas e
+       Espaçamento: 3mm entre as colunas, 2mm entre as linhas e
        2mm de margem em cada lateral (30+3+30+3+30 = 96 + 2 + 2 = 100).
-       Se a bobina do cliente tiver outro espaçamento, basta ajustar
-       as variáveis abaixo.
+
+       O PASSO da bobina (altura da etiqueta + espaço entre as linhas =
+       15 + 2 = 17mm) é o que a impressora avança por linha e vira o
+       comprimento do papel no @page: uma linha de etiquetas por página.
+       Assim cada linha começa no topo da sua etiqueta e o desalinhamento
+       NÃO acumula de uma linha para a outra. Se a bobina do cliente tiver
+       outro passo, ajustar as variáveis abaixo e o `size` do @page para o
+       mesmo valor.
        ============================================================ */
     :root {
       --bobina-largura: 100mm;
@@ -18,8 +24,14 @@
       --etiqueta-largura: 30mm;
       --etiqueta-altura: 15mm;
       --etiqueta-espaco-coluna: 3mm;
-      --etiqueta-espaco-linha: 3mm;
+      --etiqueta-espaco-linha: 2mm;
       --etiqueta-por-linha: 3;
+    }
+
+    /* Comprimento do papel = passo da bobina (15mm da etiqueta + 2mm de espaço). */
+    @page {
+      size: 100mm 17mm;
+      margin: 0;
     }
 
     * {
@@ -194,10 +206,6 @@
     }
 
     @media print {
-      @page {
-        margin: 0;
-      }
-
       .no-print {
         display: none !important;
       }
@@ -298,7 +306,7 @@
 
     <div class="dicas">
       1. Na janela de impressão, escolha a impressora de etiquetas.<br />
-      2. Papel/tamanho: largura <strong>100mm</strong> (se o driver pedir o comprimento, use o passo da bobina, ou seja, <strong>15mm por linha + 3mm de espaçamento = 18mm</strong>).<br />
+      2. Papel/tamanho: largura <strong>100mm</strong> e comprimento <strong>17mm</strong> (15mm da etiqueta + 2mm de espaço entre as linhas) — uma linha de etiquetas por página; cadastre como papel personalizado se o driver pedir.<br />
       3. Margens: <strong>nenhuma</strong>. Escala: <strong>100%</strong> (não use "ajustar à página").<br />
       4. Desmarque "cabeçalhos e rodapés" e desative o modo econômico/densidade baixa do driver.
     </div>

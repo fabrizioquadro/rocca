@@ -167,6 +167,22 @@
                     </a>
                   </li>
 
+                  <!-- Secretária -->
+                  <li class="menu-item">
+                    <a href="{{ route('secretaria.index') }}" class="menu-link">
+                      <i class="menu-icon tf-icons ri-user-star-line"></i>
+                      <div data-i18n="Secretária">Secretária</div>
+                    </a>
+                  </li>
+
+                  <!-- Enfermagem -->
+                  <li class="menu-item">
+                    <a href="{{ route('enfermagem.index') }}" class="menu-link">
+                      <i class="menu-icon tf-icons ri-nurse-line"></i>
+                      <div data-i18n="Enfermagem">Enfermagem</div>
+                    </a>
+                  </li>
+
                   <!-- Cadastros -->
                   <li class="menu-item">
                     <a href="javascript:void(0);" class="menu-link menu-toggle">

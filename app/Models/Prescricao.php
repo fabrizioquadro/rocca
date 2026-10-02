@@ -7,6 +7,7 @@ use App\Enums\TipoAtendimento;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 
 class Prescricao extends Model
 {
@@ -206,6 +207,36 @@ class Prescricao extends Model
     public function getSemanasAgendadasAttribute(): int
     {
         return $this->contarSemanasComStatus(StatusSemana::Agendada);
+    }
+
+    /**
+     * Semanas ainda Agendadas com a data prevista já vencida (as mais antigas
+     * primeiro). Base do card "em atraso" da área da Secretária: a semana estava
+     * marcada para um dia que passou e o paciente não foi aplicado.
+     *
+     * @return Collection<int, PrescricaoSemana>
+     */
+    public function getSemanasEmAtrasoAttribute(): Collection
+    {
+        $hoje = now()->startOfDay();
+
+        return $this->semanas
+            ->filter(fn (PrescricaoSemana $semana) => $semana->status === StatusSemana::Agendada
+                && $semana->data_prevista?->lt($hoje))
+            ->sortBy('data_prevista')
+            ->values();
+    }
+
+    /**
+     * Dias de atraso da semana agendada mais antiga (0 quando não há atraso).
+     */
+    public function getDiasDeAtrasoAttribute(): int
+    {
+        $semana = $this->semanas_em_atraso->first();
+
+        return $semana?->data_prevista
+            ? (int) $semana->data_prevista->startOfDay()->diffInDays(now()->startOfDay())
+            : 0;
     }
 
     /**

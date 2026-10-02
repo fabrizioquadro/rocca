@@ -24,7 +24,7 @@ class FinanceiroPagamentoService
     /**
      * Lança um pagamento e redistribui o recebido nas parcelas.
      *
-     * @param  array{valor?: mixed, forma_pagamento?: mixed, parcelas?: mixed, data_pagamento?: mixed, observacao?: ?string}  $dados
+     * @param  array{valor?: mixed, forma_pagamento?: mixed, parcelas?: mixed, data_pagamento?: mixed, observacao?: ?string, identificador?: ?string}  $dados
      */
     public function registrar(Financeiro $financeiro, array $dados): FinanceiroPagamento
     {
@@ -59,6 +59,7 @@ class FinanceiroPagamentoService
 
         $pagamento = $financeiro->pagamentos()->create([
             'valor' => $valor,
+            'identificador' => filled($dados['identificador'] ?? null) ? trim((string) $dados['identificador']) : null,
             'forma_pagamento' => $forma->value,
             'parcelas' => $parcelas,
             'data_pagamento' => $dados['data_pagamento'] ?? now()->toDateString(),
@@ -118,5 +119,53 @@ class FinanceiroPagamentoService
                 $parcela->save();
             }
         }
+    }
+
+    /**
+     * Diz quais recebimentos (pagamentos) caíram em cada parcela, seguindo a
+     * MESMA cascata do reprocessar(): pagamentos do mais antigo para o mais novo,
+     * preenchendo da 1ª parcela para a última. É derivado (nada fica gravado) e
+     * serve para exibir o ID/NSU de cada recebimento ao lado da parcela.
+     *
+     * @param  iterable<FinanceiroPagamento>  $pagamentos
+     * @param  iterable<FinanceiroParcela>  $parcelas
+     * @return array<int, list<FinanceiroPagamento>>  [parcela_id => pagamentos que a preencheram]
+     */
+    public static function recebimentosPorParcela(iterable $pagamentos, iterable $parcelas): array
+    {
+        $fila = collect($parcelas)->sortBy('numero')->values();
+
+        $restante = $fila->mapWithKeys(fn (FinanceiroParcela $parcela) => [
+            $parcela->id => round(max((float) $parcela->valor, 0), 2),
+        ])->all();
+
+        $recebimentos = array_fill_keys(array_keys($restante), []);
+
+        $ordenados = collect($pagamentos)->sortBy([
+            ['data_pagamento', 'asc'],
+            ['id', 'asc'],
+        ]);
+
+        foreach ($ordenados as $pagamento) {
+            $disponivel = round((float) $pagamento->valor, 2);
+
+            foreach (array_keys($restante) as $parcelaId) {
+                if ($disponivel <= 0) {
+                    break;
+                }
+
+                $pago = round(min($restante[$parcelaId], $disponivel), 2);
+
+                if ($pago <= 0) {
+                    continue;
+                }
+
+                $restante[$parcelaId] = round($restante[$parcelaId] - $pago, 2);
+                $disponivel = round($disponivel - $pago, 2);
+                $recebimentos[$parcelaId][] = $pagamento;
+            }
+        }
+
+        return $recebimentos;
     }
 }

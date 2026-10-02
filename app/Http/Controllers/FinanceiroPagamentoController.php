@@ -40,6 +40,7 @@ class FinanceiroPagamentoController extends Controller
             'parcelas' => ['nullable', 'integer', 'min:1', 'max:'.FormaPagamento::MAX_PARCELAS],
             'data_pagamento' => ['required', 'date'],
             'observacao' => ['nullable', 'string', 'max:255'],
+            'identificador' => ['nullable', 'string', 'max:100'],
         ], [
             'valor.required' => 'Informe o valor do pagamento.',
             'forma_pagamento.required' => 'Informe a forma de pagamento.',
@@ -48,6 +49,7 @@ class FinanceiroPagamentoController extends Controller
             'parcelas.min' => 'O número de parcelas deve ser de 1 a '.FormaPagamento::MAX_PARCELAS.'.',
             'parcelas.max' => 'O número de parcelas deve ser de 1 a '.FormaPagamento::MAX_PARCELAS.'.',
             'data_pagamento.required' => 'Informe a data do pagamento.',
+            'identificador.max' => 'O ID da transação deve ter no máximo 100 caracteres.',
         ]);
 
         $pagamento = $this->pagamentos->registrar($financeiro, $dados);
@@ -56,6 +58,7 @@ class FinanceiroPagamentoController extends Controller
             .$pagamento->valor_formatado.'.', [
             'detalhes' => array_filter([
                 'Valor' => $pagamento->valor_formatado,
+                'ID da transação' => $pagamento->identificador,
                 'Forma de pagamento' => $pagamento->forma_label,
                 'Parcelas' => (string) $pagamento->parcelas,
                 'Data do pagamento' => $pagamento->data_formatada,
@@ -80,6 +83,7 @@ class FinanceiroPagamentoController extends Controller
             .$pagamento->valor_formatado.'.', [
             'detalhes' => array_filter([
                 'Valor' => $pagamento->valor_formatado,
+                'ID da transação' => $pagamento->identificador,
                 'Forma de pagamento' => $pagamento->forma_label,
                 'Data do pagamento' => $pagamento->data_formatada,
                 'Observação' => $pagamento->observacao,

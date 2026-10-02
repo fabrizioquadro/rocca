@@ -98,6 +98,17 @@ class PrescricaoSemanaItem extends Model
     }
 
     /**
+     * O item é um PROCEDIMENTO (Bioimpedância, Coleta...)? Procedimento não tem
+     * lote, código de barras nem baixa de estoque: a aplicação é registrada só
+     * com a observação. Combo continua com a regra própria.
+     */
+    public function getEhProcedimentoAttribute(): bool
+    {
+        return $this->tipo !== 'combo'
+            && $this->medicamento?->tipo === TipoMedicamento::Procedimento;
+    }
+
+    /**
      * Valor total do item (quantidade cobrada x valor).
      */
     public function getValorTotalAttribute(): float

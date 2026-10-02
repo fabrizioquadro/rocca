@@ -163,6 +163,9 @@
                   data-item-aplicacao
                   data-item-id="{{ $item->id }}"
                   data-medicamentos-permitidos="{{ $medicamentosPermitidos }}"
+                  @if ($item->eh_procedimento)
+                    data-procedimento="1"
+                  @endif
                   @if ($item->eh_miligrama)
                     data-miligrama="1"
                     data-medicamento-id="{{ $item->medicamento_id }}"
@@ -185,7 +188,7 @@
                   <td>
                     <span class="fw-semibold">{{ $item->nome }}</span>
                     <small class="text-body-secondary d-block">
-                      {{ $item->tipo === 'combo' ? 'Combo' : 'Medicamento' }}
+                      {{ $item->tipo === 'combo' ? 'Combo' : ($item->eh_procedimento ? 'Procedimento' : 'Medicamento') }}
                       · previsto {{ $item->quantidade_formatada }}
                     </small>
                   </td>
@@ -195,48 +198,60 @@
                   <td>{{ $item->eh_miligrama ? $item->quantidade_formatada.' mg' : (int) $item->quantidade_cobranca }}</td>
 
                   <td>
-                    <div class="input-group input-group-sm">
-                      <input
-                        type="text"
-                        name="itens[{{ $item->id }}][codigo_barras]"
-                        class="form-control form-control-sm font-monospace"
-                        placeholder="{{ $item->eh_miligrama ? '1º vasilhame' : 'Ler código de barras' }}"
-                        autocomplete="off"
-                        data-codigo-barras
-                        value="{{ old("itens.{$item->id}.codigo_barras") }}" />
+                    @if ($item->eh_procedimento)
+                      {{-- Procedimento (Bioimpedância, Coleta...): não tem lote nem
+                           código de barras — a aplicação sai só com a observação --}}
+                      <span class="text-muted small">
+                        <i class="ri-information-line me-1"></i>Não usa código de barras
+                      </span>
+                    @else
+                      <div class="input-group input-group-sm">
+                        <input
+                          type="text"
+                          name="itens[{{ $item->id }}][codigo_barras]"
+                          class="form-control form-control-sm font-monospace"
+                          placeholder="{{ $item->eh_miligrama ? '1º vasilhame' : 'Ler código de barras' }}"
+                          autocomplete="off"
+                          data-codigo-barras
+                          value="{{ old("itens.{$item->id}.codigo_barras") }}" />
+
+                        @if ($item->eh_miligrama)
+                          {{-- Aplicação dividida em 2 vasilhames --}}
+                          <button
+                            type="button"
+                            class="btn btn-outline-info btn-vasilhames"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modal-vasilhames-{{ $item->id }}"
+                            title="Aplicação com 2 vasilhames">
+                            <i class="ri-archive-2-line"></i>
+                          </button>
+                        @endif
+                      </div>
 
                       @if ($item->eh_miligrama)
-                        {{-- Aplicação dividida em 2 vasilhames --}}
-                        <button
-                          type="button"
-                          class="btn btn-outline-info btn-vasilhames"
-                          data-bs-toggle="modal"
-                          data-bs-target="#modal-vasilhames-{{ $item->id }}"
-                          title="Aplicação com 2 vasilhames">
-                          <i class="ri-archive-2-line"></i>
-                        </button>
+                        {{-- 2º vasilhame: aparece só depois de confirmar no modal --}}
+                        <input
+                          type="text"
+                          name="itens[{{ $item->id }}][codigo_barras_2]"
+                          class="form-control form-control-sm font-monospace mt-1 d-none"
+                          placeholder="2º vasilhame"
+                          autocomplete="off"
+                          data-codigo-barras-2
+                          value="{{ old("itens.{$item->id}.codigo_barras_2") }}" />
+
+                        {{-- Divisão da dose feita no modal (mg de cada vasilhame) --}}
+                        <input type="hidden" name="itens[{{ $item->id }}][quantidade_1]" data-quantidade-1 value="{{ old("itens.{$item->id}.quantidade_1") }}" />
+                        <input type="hidden" name="itens[{{ $item->id }}][quantidade_2]" data-quantidade-2 value="{{ old("itens.{$item->id}.quantidade_2") }}" />
                       @endif
-                    </div>
-
-                    @if ($item->eh_miligrama)
-                      {{-- 2º vasilhame: aparece só depois de confirmar no modal --}}
-                      <input
-                        type="text"
-                        name="itens[{{ $item->id }}][codigo_barras_2]"
-                        class="form-control form-control-sm font-monospace mt-1 d-none"
-                        placeholder="2º vasilhame"
-                        autocomplete="off"
-                        data-codigo-barras-2
-                        value="{{ old("itens.{$item->id}.codigo_barras_2") }}" />
-
-                      {{-- Divisão da dose feita no modal (mg de cada vasilhame) --}}
-                      <input type="hidden" name="itens[{{ $item->id }}][quantidade_1]" data-quantidade-1 value="{{ old("itens.{$item->id}.quantidade_1") }}" />
-                      <input type="hidden" name="itens[{{ $item->id }}][quantidade_2]" data-quantidade-2 value="{{ old("itens.{$item->id}.quantidade_2") }}" />
                     @endif
                   </td>
 
                   <td data-info-lote>
-                    <span class="badge bg-label-secondary">Aguardando código</span>
+                    @if ($item->eh_procedimento)
+                      <span class="badge bg-label-info">Procedimento — sem lote</span>
+                    @else
+                      <span class="badge bg-label-secondary">Aguardando código</span>
+                    @endif
                   </td>
 
                   <td>
@@ -770,6 +785,9 @@
 
         if (pendente) {
           mostrarInfo(linha, '<span class="badge bg-label-secondary">Não aplicado</span>');
+        } else if (linha.dataset.procedimento) {
+          // Procedimento: não tem lote nem código de barras
+          mostrarInfo(linha, '<span class="badge bg-label-info">Procedimento — sem lote</span>');
         } else if (linha.dataset.miligrama) {
           avaliarMiligrama(linha);
         } else if (campoCodigo.value.trim()) {
@@ -861,7 +879,8 @@
 
         campoPendente.addEventListener('change', () => alternarCampos(linha));
 
-        campoCodigo.addEventListener('change', () => {
+        // Procedimento não tem campo de código de barras
+        campoCodigo?.addEventListener('change', () => {
           if (linha.dataset.miligrama) {
             avaliarMiligrama(linha);
           } else {
