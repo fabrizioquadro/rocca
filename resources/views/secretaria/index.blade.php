@@ -38,7 +38,7 @@
         class="btn btn-primary"
         data-bs-toggle="modal"
         data-bs-target="#modal-prescricao-rapida">
-        <i class="ri-add-line me-1"></i>Nova prescrição
+        <i class="ri-add-line me-1"></i>Bio / Coleta
       </button>
     </div>
 

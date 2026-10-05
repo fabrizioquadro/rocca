@@ -248,6 +248,19 @@ class Prescricao extends Model
     }
 
     /**
+     * A prescrição está em aberto? Sim enquanto houver semana com aplicação
+     * ainda pendente (agendada, na fila, em atendimento ou em andamento).
+     *
+     * Prescrição sem nenhuma semana com aplicação (todas "sem aplicação") não
+     * conta como aberta: não há nada para aplicar.
+     */
+    public function estaAberta(): bool
+    {
+        return $this->semanas_com_aplicacao > 0
+            && $this->semanas_concluidas < $this->semanas_com_aplicacao;
+    }
+
+    /**
      * Situação da prescrição, DERIVADA das semanas (nunca gravada no banco):
      * mostra o estágio mais avançado que ainda está em andamento.
      *

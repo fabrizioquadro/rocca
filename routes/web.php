@@ -196,6 +196,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/prescricoes', [PrescricaoController::class, 'index'])->name('prescricoes.index');
     Route::get('/prescricoes/criar', [PrescricaoController::class, 'create'])->name('prescricoes.create');
     Route::get('/prescricoes/pacientes', [PrescricaoController::class, 'buscarPacientes'])->name('prescricoes.pacientes');
+
+    // O paciente já tem prescrição em aberto? (aviso no cadastro)
+    Route::get('/prescricoes/pacientes/{paciente}/aberta', [PrescricaoController::class, 'prescricaoAberta'])->name('prescricoes.paciente-aberta');
     Route::post('/prescricoes', [PrescricaoController::class, 'store'])->name('prescricoes.store');
     Route::get('/prescricoes/{prescricao}', [PrescricaoController::class, 'show'])->name('prescricoes.show');
     Route::delete('/prescricoes/{prescricao}', [PrescricaoController::class, 'destroy'])->name('prescricoes.destroy');

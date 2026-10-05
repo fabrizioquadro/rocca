@@ -323,6 +323,31 @@ class PrescricaoController extends Controller
     }
 
     /**
+     * Verifica se o paciente já tem uma prescrição em aberto (não finalizada).
+     * Usado no cadastro para avisar e pedir confirmação antes de criar outra.
+     */
+    public function prescricaoAberta(Paciente $paciente)
+    {
+        $aberta = Prescricao::with('semanas')
+            ->where('paciente_id', $paciente->id)
+            ->orderByDesc('id')
+            ->get()
+            ->first(fn (Prescricao $prescricao) => $prescricao->estaAberta());
+
+        if (! $aberta) {
+            return response()->json(['aberta' => false]);
+        }
+
+        return response()->json([
+            'aberta' => true,
+            'id' => $aberta->id,
+            'situacao' => $aberta->situacao,
+            'progresso' => ($aberta->ultima_semana_aplicada ?? 0).'/'.$aberta->semanas_com_aplicacao,
+            'criada_em' => $aberta->created_at?->format('d/m/Y'),
+        ]);
+    }
+
+    /**
      * Regras de validação do formulário.
      *
      * @return array<string, mixed>

@@ -108,6 +108,64 @@
       atualizarObservacaoPaciente();
     }
 
+    // Prescricao em aberto: o paciente que ja tem uma prescricao nao finalizada
+    // ganha um aviso assim que e escolhido e o cadastro so continua depois da
+    // confirmacao (o cadastro rapido de Bio/Coleta da Secretaria nao usa isto).
+    const avisoAberta = document.getElementById('aviso-prescricao-aberta');
+    const avisoAbertaTexto = document.getElementById('aviso-prescricao-aberta-texto');
+
+    let prescricaoAberta = null;
+    let consultaAberta = { pacienteId: null, promessa: null };
+    let abertaConfirmada = false;
+
+    const mostrarAvisoAberta = () => {
+      if (!avisoAberta || !avisoAbertaTexto) return;
+
+      avisoAbertaTexto.textContent = prescricaoAberta
+        ? `Prescrição #${prescricaoAberta.id} — ${prescricaoAberta.situacao}, semana ${prescricaoAberta.progresso}.`
+        : '';
+
+      avisoAberta.classList.toggle('d-none', !prescricaoAberta);
+    };
+
+    const consultarPrescricaoAberta = (pacienteId) => {
+      if (consultaAberta.pacienteId === pacienteId) {
+        return consultaAberta.promessa || Promise.resolve(prescricaoAberta);
+      }
+
+      prescricaoAberta = null;
+      consultaAberta = { pacienteId, promessa: Promise.resolve(null) };
+      mostrarAvisoAberta();
+
+      if (!pacienteId || !window.prescricaoAbertaUrl) {
+        return consultaAberta.promessa;
+      }
+
+      consultaAberta.promessa = fetch(window.prescricaoAbertaUrl.replace('__PACIENTE__', pacienteId), {
+        headers: { 'Accept': 'application/json' }
+      })
+        .then((resposta) => (resposta.ok ? resposta.json() : null))
+        .then((dados) => {
+          prescricaoAberta = dados && dados.aberta ? dados : null;
+          mostrarAvisoAberta();
+
+          return prescricaoAberta;
+        })
+        .catch(() => null);
+
+      return consultaAberta.promessa;
+    };
+
+    if (pacienteSelect) {
+      pacienteSelect.addEventListener('change', () => {
+        abertaConfirmada = false;
+
+        consultarPrescricaoAberta(pacienteSelect.value);
+      });
+
+      consultarPrescricaoAberta(pacienteSelect.value);
+    }
+
     const container = document.getElementById('semanas');
     const modeloSemana = document.getElementById('modelo-semana');
     const botaoAdicionarSemana = document.getElementById('adicionar-semana');
@@ -1108,6 +1166,34 @@
 
           if (campoAnexos) campoAnexos.focus();
         }
+      });
+
+      // Prescricao em aberto: avisa e pede confirmacao antes de enviar. Este
+      // listener roda DEPOIS do do anexo (por isso o event.defaultPrevented) e
+      // o reenvio usa requestSubmit(), que dispara o evento de novo — assim a
+      // regra do anexo e a validacao do navegador continuam valendo.
+      formularioPrescricao.addEventListener('submit', (event) => {
+        if (abertaConfirmada || event.defaultPrevented) return;
+
+        event.preventDefault();
+
+        consultarPrescricaoAberta(pacienteSelect ? pacienteSelect.value : '').then((aberta) => {
+          const continuar = !aberta || window.confirm(
+            `Este paciente já possui a prescrição #${aberta.id} em aberto `
+            + `(${aberta.situacao}, semana ${aberta.progresso}).\n\n`
+            + 'Deseja cadastrar uma nova prescrição mesmo assim?'
+          );
+
+          if (!continuar) return;
+
+          abertaConfirmada = true;
+
+          if (typeof formularioPrescricao.requestSubmit === 'function') {
+            formularioPrescricao.requestSubmit();
+          } else {
+            formularioPrescricao.submit();
+          }
+        });
       });
     }
 

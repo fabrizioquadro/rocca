@@ -55,6 +55,15 @@
                   style="white-space: pre-line;">{{ $pacienteSelecionado?->observacao }}</span>
               </div>
             </div>
+
+            {{-- Prescrição em aberto do paciente: avisa antes de cadastrar outra --}}
+            <div class="alert alert-warning d-flex gap-2 d-none mt-3 mb-0" id="aviso-prescricao-aberta" role="alert">
+              <i class="ri-error-warning-line ri-20px"></i>
+              <div>
+                <strong class="d-block">Atenção: paciente já possui prescrição em aberto</strong>
+                <span id="aviso-prescricao-aberta-texto"></span>
+              </div>
+            </div>
           </div>
 
           <div class="col-md-6">
@@ -608,6 +617,7 @@
   <script>
     window.semanasPrescricao = @json($semanasIniciais);
     window.prescricaoPacientesUrl = '{{ route('prescricoes.pacientes') }}';
+    window.prescricaoAbertaUrl = '{{ route('prescricoes.paciente-aberta', ['paciente' => '__PACIENTE__']) }}';
   </script>
 
   @include('partials.crud-scripts')

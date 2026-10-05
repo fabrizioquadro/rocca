@@ -889,6 +889,31 @@
         });
       });
 
+      // Leitora de código de barras: ela digita o código e manda um "Enter" no
+      // fim. Sem isto o form seria enviado na hora, registrando a aplicação (ou
+      // abrindo o vasilhame) sem conferência. O Enter só confirma a leitura
+      // (dispara a consulta do código/lote); o envio fica por conta dos botões.
+      const bloquearEnterDaLeitora = (form) => {
+        form?.addEventListener('keydown', (evento) => {
+          const campo = evento.target;
+          const campoDeTexto = campo.tagName === 'INPUT' && campo.type !== 'hidden' && campo.type !== 'checkbox';
+
+          if (evento.key !== 'Enter' || ! campoDeTexto) {
+            return;
+          }
+
+          evento.preventDefault();
+
+          // blur() dispara o "change" que consulta o código/lote; o focus()
+          // devolve o cursor para o campo, pronto para a próxima leitura.
+          campo.blur();
+          campo.focus();
+        });
+      };
+
+      bloquearEnterDaLeitora(document.getElementById('form-aplicacao'));
+      bloquearEnterDaLeitora(document.getElementById('form-abrir-vasilhame'));
+
       // Marca/desmarca todas as linhas como pendentes
       const marcarTodos = document.querySelector('[data-marcar-todos-pendentes]');
 
