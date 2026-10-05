@@ -65,7 +65,7 @@
         <nav class="layout-navbar navbar navbar-expand-xl align-items-center bg-navbar-theme" id="layout-navbar">
           <div class="container-xxl">
             <div class="navbar-brand app-brand demo d-none d-xl-flex py-0 me-6">
-              <a href="{{ route('home') }}" class="app-brand-link gap-2">
+              <a href="{{ route(auth()->user()?->rotaInicial() ?? 'home') }}" class="app-brand-link gap-2">
                 <img
                   src="{{ asset('template/assets/img/logo-tight.png') }}"
                   alt="{{ config('app.name', 'Instituto Rocca') }}"
@@ -157,16 +157,24 @@
           <!-- Content wrapper -->
           <div class="content-wrapper">
             <!-- Menu -->
+            @php
+              $tipoUsuario = auth()->user()?->tipo;
+              $ehAdministrador = $tipoUsuario === \App\Enums\TipoUsuario::Administrador;
+              $podeVerSecretaria = $ehAdministrador || $tipoUsuario === \App\Enums\TipoUsuario::Secretaria;
+            @endphp
             <aside id="layout-menu" class="layout-menu-horizontal menu-horizontal menu bg-menu-theme flex-grow-0">
               <div class="container-xxl d-flex h-100">
                 <ul class="menu-inner">
+                  @if ($ehAdministrador)
                   <li class="menu-item">
                     <a href="{{ route('home') }}" class="menu-link">
                       <i class="menu-icon tf-icons ri-dashboard-3-line"></i>
                       <div data-i18n="Dashboard">Dashboard</div>
                     </a>
                   </li>
+                  @endif
 
+                  @if ($podeVerSecretaria)
                   <!-- Secretária -->
                   <li class="menu-item">
                     <a href="{{ route('secretaria.index') }}" class="menu-link">
@@ -174,6 +182,7 @@
                       <div data-i18n="Secretária">Secretária</div>
                     </a>
                   </li>
+                  @endif
 
                   <!-- Enfermagem -->
                   <li class="menu-item">

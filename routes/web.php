@@ -42,14 +42,14 @@ use Illuminate\Support\Facades\Route;
 // Página pública de login (raiz do sistema)
 Route::get('/', function () {
     if (auth()->check()) {
-        return redirect()->route('home');
+        return redirect()->route(auth()->user()->rotaInicial());
     }
 
     return view('auth.login');
 });
 
 // Área logada (dashboard com as áreas operacionais)
-Route::get('/home', [DashboardController::class, 'index'])->middleware('auth')->name('home');
+Route::get('/home', [DashboardController::class, 'index'])->middleware(['auth', 'perfil:administrador'])->name('home');
 
 // Autenticação
 Route::middleware('guest')->group(function () {
@@ -72,7 +72,11 @@ Route::post('/logout', [LoginController::class, 'logout'])
 // Área logada
 Route::middleware('auth')->group(function () {
     // Áreas operacionais por perfil (páginas iniciais; conteúdo a definir)
-    Route::get('/secretaria', [SecretariaController::class, 'index'])->name('secretaria.index');
+    Route::get('/secretaria', [SecretariaController::class, 'index'])->middleware('perfil:administrador,secretaria')->name('secretaria.index');
+
+    // Cadastro rápido da Secretaria: 1 semana, só Bioimpedância e/ou Coleta.
+    Route::get('/secretaria/medicos', [SecretariaController::class, 'medicos'])->middleware('perfil:administrador,secretaria')->name('secretaria.medicos');
+    Route::post('/secretaria/prescricao-rapida', [SecretariaController::class, 'storePrescricaoRapida'])->middleware('perfil:administrador,secretaria')->name('secretaria.prescricao-rapida.store');
     Route::get('/enfermagem', [EnfermagemController::class, 'index'])->name('enfermagem.index');
 
     // Perfil do usuário logado

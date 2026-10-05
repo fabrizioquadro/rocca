@@ -62,6 +62,18 @@ class User extends Authenticatable
     }
 
     /**
+     * Rota inicial do usuário conforme o seu perfil.
+     */
+    public function rotaInicial(): string
+    {
+        return match ($this->tipo) {
+            TipoUsuario::Secretaria => 'secretaria.index',
+            TipoUsuario::Enfermagem => 'enfermagem.index',
+            default => 'home',
+        };
+    }
+
+    /**
      * Clínica à qual o usuário pertence.
      */
     public function clinica()

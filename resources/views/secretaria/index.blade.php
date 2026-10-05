@@ -3,6 +3,24 @@
 @section('title', 'Secretária')
 
 @section('content')
+  @if (session('success') || session('error'))
+    <div class="card mb-6">
+      <div class="card-body d-flex flex-column gap-2">
+        @if (session('success'))
+          <div class="alert alert-success mb-0" role="alert">
+            {{ session('success') }}
+          </div>
+        @endif
+
+        @if (session('error'))
+          <div class="alert alert-danger mb-0" role="alert">
+            {{ session('error') }}
+          </div>
+        @endif
+      </div>
+    </div>
+  @endif
+
   {{-- 1º card: busca por paciente (todas as prescrições do paciente escolhido) --}}
   <div class="card mb-6">
     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -14,6 +32,14 @@
           <span class="badge bg-label-primary">{{ $prescricoes->count() }} prescrição(ões)</span>
         @endif
       </div>
+
+      <button
+        type="button"
+        class="btn btn-primary"
+        data-bs-toggle="modal"
+        data-bs-target="#modal-prescricao-rapida">
+        <i class="ri-add-line me-1"></i>Nova prescrição
+      </button>
     </div>
 
     <div class="card-body">
@@ -474,6 +500,166 @@
       </div>
     </div>
   </div>
+  {{-- Cadastro rápido: prescrição com 1 semana e apenas Bioimpedância/Coleta --}}
+  <div class="modal fade" id="modal-prescricao-rapida" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <form method="POST" action="{{ route('secretaria.prescricao-rapida.store') }}" id="form-prescricao-rapida">
+          @csrf
+          <input type="hidden" name="_rapida" value="1" />
+
+          <div class="modal-header">
+            <h5 class="modal-title">
+              <i class="ri-add-circle-line me-1"></i>Nova prescrição (1 semana)
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+
+          <div class="modal-body">
+            @if ($errors->any() && old('_rapida'))
+              <div class="alert alert-danger" role="alert">
+                <ul class="mb-0 ps-3">
+                  @foreach ($errors->all() as $erro)
+                    <li>{{ $erro }}</li>
+                  @endforeach
+                </ul>
+              </div>
+            @endif
+
+            <div class="row g-3">
+              <div class="col-md-8">
+                <label class="form-label" for="rapida_paciente_id">Paciente *</label>
+                <select id="rapida_paciente_id" name="paciente_id" class="form-select" required>
+                  @if ($pacienteRapido)
+                    <option
+                      value="{{ $pacienteRapido->id }}"
+                      data-observacao="{{ $pacienteRapido->observacao }}"
+                      selected>
+                      {{ $pacienteRapido->nome }}
+                    </option>
+                  @endif
+                </select>
+                <small class="text-muted">Digite o nome (ou o CPF) para buscar.</small>
+
+                <div class="alert alert-warning d-none mt-3 mb-0" id="rapida-observacao-paciente" role="alert">
+                  <strong class="d-block">Atenção: observação do paciente</strong>
+                  <span style="white-space: pre-line;"></span>
+                </div>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label" for="rapida_data_prevista">Data da semana *</label>
+                <input
+                  type="date"
+                  id="rapida_data_prevista"
+                  name="data_prevista"
+                  class="form-control"
+                  value="{{ old('data_prevista', $dia->toDateString()) }}"
+                  required />
+                <small class="text-muted">Vem com a data de hoje; pode alterar.</small>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="rapida_medico_id">Médico</label>
+                <select id="rapida_medico_id" name="medico_id" class="form-select">
+                  <option value="">Carregando médicos...</option>
+                </select>
+                <input type="hidden" id="rapida_medico_nome" name="medico_nome" value="{{ old('medico_nome') }}" />
+                <small class="text-muted d-block" id="rapida-medicos-aviso"></small>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="rapida_clinica_id">Clínica *</label>
+
+                @if ($clinicaUsuario)
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="rapida_clinica_nome"
+                    value="{{ $clinicas->firstWhere('id', $clinicaUsuario)?->nome ?? 'Clínica do usuário logado' }}"
+                    readonly />
+                  <input type="hidden" name="clinica_id" value="{{ $clinicaUsuario }}" />
+                @else
+                  <select id="rapida_clinica_id" name="clinica_id" class="form-select" required>
+                    <option value="">Selecione...</option>
+                    @foreach ($clinicas as $clinica)
+                      <option value="{{ $clinica->id }}" @selected(old('clinica_id') == $clinica->id)>
+                        {{ $clinica->nome }}
+                      </option>
+                    @endforeach
+                  </select>
+                @endif
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="rapida_tipo_atendimento">Tipo de atendimento *</label>
+                <select id="rapida_tipo_atendimento" name="tipo_atendimento" class="form-select" required>
+                  <option value="">Selecione...</option>
+                  @foreach ($tipos as $tipo)
+                    <option value="{{ $tipo->value }}" @selected(old('tipo_atendimento') === $tipo->value)>
+                      {{ $tipo->label() }}
+                    </option>
+                  @endforeach
+                </select>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="rapida_agendamento">Agendamento</label>
+                <input
+                  type="text"
+                  id="rapida_agendamento"
+                  name="agendamento"
+                  class="form-control"
+                  maxlength="100"
+                  placeholder="Ex.: Terça-feira às 14h"
+                  value="{{ old('agendamento') }}" />
+              </div>
+
+              <div class="col-12">
+                <label class="form-label d-block">Procedimentos *</label>
+
+                @foreach ($procedimentos as $procedimento)
+                  <div class="form-check form-check-inline">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="procedimento-{{ $procedimento->id }}"
+                      name="procedimentos[]"
+                      value="{{ $procedimento->id }}"
+                      @checked(in_array($procedimento->id, array_map('intval', (array) old('procedimentos', [])))) />
+                    <label class="form-check-label" for="procedimento-{{ $procedimento->id }}">
+                      {{ $procedimento->nome }}
+                    </label>
+                  </div>
+                @endforeach
+
+                <small class="text-muted d-block">Escolha Bioimpedância, Coleta ou as duas.</small>
+                <small class="text-danger d-none d-block" id="rapida-procedimentos-erro">
+                  Escolha Bioimpedância, Coleta ou as duas.
+                </small>
+              </div>
+
+              <div class="col-12">
+                <label class="form-label" for="rapida_observacoes">Observações</label>
+                <textarea
+                  id="rapida_observacoes"
+                  name="observacoes"
+                  rows="2"
+                  class="form-control">{{ old('observacoes') }}</textarea>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary">
+              <i class="ri-save-line me-1"></i>Cadastrar prescrição
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 @endsection
 
 @push('styles')
@@ -486,6 +672,7 @@
   <script src="{{ asset('template/assets/vendor/libs/select2/select2.js') }}"></script>
   <script>
     window.secretariaPacientesUrl = '{{ route('prescricoes.pacientes') }}';
+    window.secretariaMedicosUrl = '{{ route('secretaria.medicos') }}';
 
     $(function () {
       // Paciente: base grande, então a busca é por AJAX (igual ao cadastro da prescrição)
@@ -557,6 +744,89 @@
           })
         }));
       }
+
+      // ---------------------------------------------------------------------
+      // Cadastro rápido: prescrição com 1 semana e só Bioimpedância/Coleta.
+      // ---------------------------------------------------------------------
+      $('#rapida_paciente_id').select2({
+        dropdownParent: $('#modal-prescricao-rapida'),
+        width: '100%',
+        placeholder: 'Digite para buscar o paciente...',
+        allowClear: true,
+        minimumInputLength: 3,
+        language: {
+          inputTooShort: () => 'Digite pelo menos 3 letras',
+          noResults: () => 'Nenhum paciente encontrado',
+          searching: () => 'Buscando...'
+        },
+        ajax: {
+          url: window.secretariaPacientesUrl,
+          dataType: 'json',
+          delay: 300,
+          cache: true,
+          data: (params) => ({ busca: params.term }),
+          processResults: (data) => data
+        }
+      }).on('select2:select', function (evento) {
+        const observacao = (evento.params.data || {}).observacao || '';
+        const $aviso = $('#rapida-observacao-paciente');
+
+        $aviso.find('span').text(observacao);
+        $aviso.toggleClass('d-none', observacao === '');
+      });
+
+      // Os médicos vêm da Feegow: só são buscados quando o modal abre (uma vez).
+      const $medicoRapida = $('#rapida_medico_id');
+      let medicosCarregados = false;
+
+      $('#modal-prescricao-rapida').on('show.bs.modal', function () {
+        if (medicosCarregados) {
+          return;
+        }
+
+        medicosCarregados = true;
+
+        $.getJSON(window.secretariaMedicosUrl)
+          .done(function (retorno) {
+            const medicos = retorno.medicos || [];
+
+            $medicoRapida.empty().append('<option value="">Selecione...</option>');
+
+            medicos.forEach(function (medico) {
+              const descricao = medico.conselho ? medico.nome + ' (' + medico.conselho + ')' : medico.nome;
+
+              $medicoRapida.append(
+                $('<option>').val(medico.id).attr('data-nome', medico.nome).text(descricao)
+              );
+            });
+
+            if (retorno.erro) {
+              $('#rapida-medicos-aviso').text('Não foi possível carregar os médicos: ' + retorno.erro);
+            }
+          })
+          .fail(function () {
+            medicosCarregados = false;
+            $medicoRapida.empty().append('<option value="">Selecione...</option>');
+            $('#rapida-medicos-aviso').text('Não foi possível carregar os médicos da Feegow.');
+          });
+      });
+
+      $('#form-prescricao-rapida').on('submit', function (evento) {
+        $('#rapida_medico_nome').val($medicoRapida.find('option:selected').data('nome') || '');
+
+        const temProcedimento = $('#form-prescricao-rapida input[name="procedimentos[]"]:checked').length > 0;
+
+        $('#rapida-procedimentos-erro').toggleClass('d-none', temProcedimento);
+
+        if (!temProcedimento) {
+          evento.preventDefault();
+        }
+      });
+
+      @if ($errors->any() && old('_rapida'))
+        // Voltou com erro de validação: reabre o modal com o que foi digitado.
+        new bootstrap.Modal(document.getElementById('modal-prescricao-rapida')).show();
+      @endif
     });
   </script>
 @endpush
