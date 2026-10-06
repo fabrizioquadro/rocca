@@ -569,7 +569,7 @@
               </div>
 
               <div class="col-md-6">
-                <label class="form-label" for="rapida_clinica_id">Clínica</label>
+                <label class="form-label" for="rapida_clinica_id">Clínica *</label>
 
                 @if ($clinicaUsuario)
                   <input
@@ -580,7 +580,7 @@
                     readonly />
                   <input type="hidden" name="clinica_id" value="{{ $clinicaUsuario }}" />
                 @else
-                  <select id="rapida_clinica_id" name="clinica_id" class="form-select">
+                  <select id="rapida_clinica_id" name="clinica_id" class="form-select" required>
                     <option value="">Selecione...</option>
                     @foreach ($clinicas as $clinica)
                       <option value="{{ $clinica->id }}" @selected(old('clinica_id') == $clinica->id)>
