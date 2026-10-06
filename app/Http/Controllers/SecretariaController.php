@@ -126,6 +126,9 @@ class SecretariaController extends Controller
     /**
      * Cadastro rápido: prescrição com uma única semana e apenas os
      * procedimentos Bioimpedância e/ou Coleta.
+     *
+     * Cadastro LIVRE: só paciente, data e Bio/Coleta são obrigatórios. Médico,
+     * clínica, tipo de atendimento, agendamento e observação são opcionais.
      */
     public function storePrescricaoRapida(Request $request)
     {
@@ -133,8 +136,8 @@ class SecretariaController extends Controller
             'paciente_id' => ['required', 'integer', 'exists:pacientes,id'],
             'medico_id' => ['nullable', 'integer'],
             'medico_nome' => ['nullable', 'string', 'max:150'],
-            'clinica_id' => ['required', 'integer', 'exists:clinicas,id'],
-            'tipo_atendimento' => ['required', Rule::enum(TipoAtendimento::class)],
+            'clinica_id' => ['nullable', 'integer', 'exists:clinicas,id'],
+            'tipo_atendimento' => ['nullable', Rule::enum(TipoAtendimento::class)],
             'agendamento' => ['nullable', 'string', 'max:100'],
             'observacoes' => ['nullable', 'string', 'max:2000'],
             'data_prevista' => ['required', 'date'],
@@ -142,25 +145,34 @@ class SecretariaController extends Controller
             'procedimentos.*' => ['integer', Rule::in(self::PROCEDIMENTOS_RAPIDOS)],
         ], [
             'paciente_id.required' => 'Escolha o paciente.',
-            'clinica_id.required' => 'Escolha a clínica.',
-            'tipo_atendimento.required' => 'Escolha o tipo de atendimento.',
             'data_prevista.required' => 'Informe a data da semana.',
             'procedimentos.required' => 'Escolha Bioimpedância, Coleta ou as duas.',
             'procedimentos.*.in' => 'Só é possível escolher Bioimpedância e/ou Coleta.',
         ]);
+
+        // Sem clínica escolhida, usa a do usuário logado (ou a primeira
+        // cadastrada). Sem tipo escolhido, é o próprio Coleta/Bio.
+        $clinicaId = $dados['clinica_id'] ?? auth()->user()?->clinica_id ?? Clinica::orderBy('id')->value('id');
+        $tipoAtendimento = $dados['tipo_atendimento'] ?? TipoAtendimento::ColetaBio->value;
+
+        if (! $clinicaId) {
+            throw ValidationException::withMessages([
+                'clinica_id' => 'Nenhuma clínica cadastrada para vincular a prescrição.',
+            ]);
+        }
 
         $idsProcedimentos = array_values(array_intersect(
             self::PROCEDIMENTOS_RAPIDOS,
             array_map('intval', $dados['procedimentos'])
         ));
 
-        $prescricao = DB::transaction(function () use ($dados, $idsProcedimentos) {
+        $prescricao = DB::transaction(function () use ($dados, $idsProcedimentos, $clinicaId, $tipoAtendimento) {
             $prescricao = Prescricao::create([
                 'paciente_id' => $dados['paciente_id'],
                 'medico_id' => $dados['medico_id'] ?? null,
                 'medico_nome' => $dados['medico_nome'] ?? null,
-                'clinica_id' => $dados['clinica_id'],
-                'tipo_atendimento' => $dados['tipo_atendimento'],
+                'clinica_id' => $clinicaId,
+                'tipo_atendimento' => $tipoAtendimento,
                 'agendamento' => $dados['agendamento'] ?? null,
                 'observacoes' => $dados['observacoes'] ?? null,
                 'user_id' => auth()->id(),
