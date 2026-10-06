@@ -333,7 +333,11 @@ class FeegowAplicacaoService
         $linhas[] = $aplicacoes->isEmpty() ? '  (nenhum)' : '';
 
         foreach ($aplicacoes as $aplicacao) {
-            $nome = $aplicacao->item?->nome ?? $aplicacao->medicamento?->nome ?? 'Medicamento';
+            // Num combo cada aplicação é de um medicamento; sem isso a nota
+            // repetiria o nome do combo em todas as linhas.
+            $nome = $aplicacao->item?->tipo === 'combo'
+                ? ($aplicacao->medicamento?->nome ?? $aplicacao->item?->nome ?? 'Medicamento')
+                : ($aplicacao->item?->nome ?? $aplicacao->medicamento?->nome ?? 'Medicamento');
             $quantidade = $aplicacao->quantidade_formatada.($aplicacao->vasilhame_aberto_id ? ' mg' : ' unidade(s)');
 
             $linhas[] = '  - '.$nome

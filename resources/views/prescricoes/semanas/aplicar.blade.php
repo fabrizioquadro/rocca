@@ -145,10 +145,16 @@
             </thead>
             <tbody>
               @foreach ($aMarcar as $item)
+                {{-- Combo: em vez de uma linha só do combo, aparece uma linha
+                     por medicamento que o compõe, cada uma com o seu código de
+                     barras para leitura individual. --}}
+                @if ($item->tipo === 'combo')
+                  @include('prescricoes.semanas._aplicacao-combo', ['item' => $item])
+                  @continue
+                @endif
+
                 @php
-                  if ($item->tipo === 'combo') {
-                      $medicamentosPermitidos = $item->combo?->itens->pluck('medicamento_id')->filter()->implode(',');
-                  } elseif ($item->eh_miligrama) {
+                  if ($item->eh_miligrama) {
                       // Mesmo produto: vale vasilhame do medicamento do item ou de
                       // outro do mesmo grupo (Mounjaro 60MG / Mounjaro 90MG)
                       $medicamentosPermitidos = $item->medicamento->idsDoMesmoProduto()->implode(',');
@@ -188,7 +194,7 @@
                   <td>
                     <span class="fw-semibold">{{ $item->nome }}</span>
                     <small class="text-body-secondary d-block">
-                      {{ $item->tipo === 'combo' ? 'Combo' : ($item->eh_procedimento ? 'Procedimento' : 'Medicamento') }}
+                      {{ $item->eh_procedimento ? 'Procedimento' : 'Medicamento' }}
                       · previsto {{ $item->quantidade_formatada }}
                     </small>
                   </td>

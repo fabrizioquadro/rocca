@@ -362,7 +362,7 @@ class PrescricaoSemanaController extends Controller
             return $bloqueio;
         }
 
-        $semana->load(['itens.medicamento', 'itens.combo.itens.medicamento']);
+        $semana->load(['itens.medicamento', 'itens.combo.itens.medicamento', 'itens.aplicacoes']);
         $atendimento->load(['aplicacoes.item', 'aplicacoes.entradaItem', 'aplicacoes.medicamento', 'aplicacoes.user', 'aplicacoes.vasilhameAberto']);
 
         // Medicamentos por mg desta aplicação: são eles que podem abrir vasilhame
@@ -506,6 +506,13 @@ class PrescricaoSemanaController extends Controller
             'itens.*.quantidade' => ['nullable'],
             'itens.*.aplicado_em' => ['nullable', 'date'],
             'itens.*.observacao' => ['nullable', 'string', 'max:1000'],
+
+            // Combo: cada medicamento do combo tem o seu próprio "Pendente",
+            // código de barras e observação
+            'itens.*.componentes' => ['nullable', 'array'],
+            'itens.*.componentes.*.pendente' => ['nullable', 'boolean'],
+            'itens.*.componentes.*.codigo_barras' => ['nullable', 'string', 'max:100'],
+            'itens.*.componentes.*.observacao' => ['nullable', 'string', 'max:1000'],
         ], [
             'itens.required' => 'Informe a situação de cada medicamento.',
             'itens.*.aplicado_em.date' => 'Informe uma data/hora de aplicação válida.',

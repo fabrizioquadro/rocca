@@ -18,6 +18,7 @@ use App\Models\Medicamento;
 use App\Models\Prescricao;
 use App\Models\PrescricaoLog;
 use App\Models\PrescricaoSemana;
+use App\Models\PrescricaoSemanaAplicacao;
 use App\Models\PrescricaoSemanaAtendimento;
 use App\Models\PrescricaoSemanaItem;
 use App\Models\User;
@@ -309,7 +310,7 @@ class PrescricaoSemanaService
         }
 
         $semana = $atendimento->semana()
-            ->with(['itens.medicamento', 'itens.combo.itens', 'prescricao'])
+            ->with(['itens.medicamento', 'itens.combo.itens.medicamento', 'prescricao'])
             ->first();
 
         $clinicaId = (int) $semana->prescricao->clinica_id;
@@ -323,7 +324,13 @@ class PrescricaoSemanaService
 
         // Cada item vem da tela com o checkbox "Pendente": marcado = não
         // aplicado; desmarcado = aplicado (aí o código de barras é obrigatório).
+        // O combo não tem esse checkbox no item: cada medicamento dele decide o
+        // seu, dentro do próprio registro.
         foreach ($aMarcar as $item) {
+            if ($item->tipo === 'combo') {
+                continue;
+            }
+
             $linha = $informados[$item->id] ?? [];
 
             $informados[$item->id]['situacao'] = filter_var($linha['pendente'] ?? false, FILTER_VALIDATE_BOOLEAN)
@@ -332,7 +339,7 @@ class PrescricaoSemanaService
         }
 
         foreach ($aMarcar as $item) {
-            $this->registrarItemDoAtendimento($atendimento, $semana, $item, $informados[$item->id], $clinicaId);
+            $this->registrarItemDoAtendimento($atendimento, $semana, $item, $informados[$item->id] ?? [], $clinicaId);
         }
 
         $atendimento->update([
@@ -387,6 +394,13 @@ class PrescricaoSemanaService
         int $clinicaId
     ): void {
         $observacao = filled($linha['observacao'] ?? null) ? $linha['observacao'] : null;
+
+        // Combo: cada medicamento é lido e registrado individualmente.
+        if ($item->tipo === 'combo') {
+            $this->registrarItemCombo($atendimento, $semana, $item, $linha, $clinicaId);
+
+            return;
+        }
 
         if (($linha['situacao'] ?? '') !== 'aplicado') {
             $item->update([
@@ -447,6 +461,32 @@ class PrescricaoSemanaService
             ]);
         }
 
+        $this->registrarAplicacaoEmLote(
+            $atendimento, $semana, $item, $lote, (float) $quantidade, $aplicadoEm, $observacao, $item->nome, $clinicaId
+        );
+
+        $item->update([
+            'status' => StatusSemanaItem::Aplicado,
+            'observacao' => $observacao ?? $item->observacao,
+        ]);
+    }
+
+    /**
+     * Cria a aplicação, dá baixa no estoque e registra o log. O status do item
+     * é atualizado por quem chama — um combo tem vários componentes e só fica
+     * aplicado quando todos forem registrados.
+     */
+    private function registrarAplicacaoEmLote(
+        PrescricaoSemanaAtendimento $atendimento,
+        PrescricaoSemana $semana,
+        PrescricaoSemanaItem $item,
+        EntradaItem $lote,
+        float $quantidade,
+        Carbon $aplicadoEm,
+        ?string $observacao,
+        string $nome,
+        int $clinicaId
+    ): void {
         $atendimento->aplicacoes()->create([
             'prescricao_semana_item_id' => $item->id,
             'entrada_item_id' => $lote->id,
@@ -470,27 +510,164 @@ class PrescricaoSemanaService
             'observacao' => 'Aplicação na prescrição #'.$semana->prescricao_id.' — semana '.$semana->numero,
         ]);
 
-        $item->update([
-            'status' => StatusSemanaItem::Aplicado,
-            'observacao' => $observacao ?? $item->observacao,
-        ]);
-
         PrescricaoLog::registrar(
             $semana->prescricao_id,
             TipoLogPrescricao::Aplicacao,
-            $item->nome.' aplicado.',
+            $nome.' aplicado.',
             ['detalhes' => array_filter([
-                'Medicamento' => $item->nome,
-                'Quantidade aplicada' => (string) $quantidade,
+                'Medicamento' => $nome,
+                'Quantidade aplicada' => Numero::formatar($quantidade),
                 'Código de barras' => $lote->codigo_barras,
                 'Lote' => $lote->lote,
                 'Vencimento' => $lote->vencimento_formatado,
                 'Aplicado em' => $aplicadoEm->format('d/m/Y H:i'),
-                'Baixa no estoque' => (string) $quantidade.' unidade(s) na clínica',
+                'Baixa no estoque' => Numero::formatar($quantidade).' unidade(s) na clínica',
                 'Observação' => $observacao,
             ])],
             $semana->id
         );
+    }
+
+    /**
+     * Aplicação de um COMBO: cada medicamento que compõe o combo é lido e
+     * registrado individualmente (uma aplicação por componente). O item só fica
+     * "Aplicado" quando todos os componentes foram aplicados; enquanto faltar
+     * algum ele fica "Pendente" e o paciente volta para completar.
+     *
+     * @param  array<string, mixed>  $linha
+     */
+    private function registrarItemCombo(
+        PrescricaoSemanaAtendimento $atendimento,
+        PrescricaoSemana $semana,
+        PrescricaoSemanaItem $item,
+        array $linha,
+        int $clinicaId
+    ): void {
+        $observacao = filled($linha['observacao'] ?? null) ? $linha['observacao'] : null;
+        $informados = $linha['componentes'] ?? [];
+        $aplicadoEm = $this->dataHora($linha['aplicado_em'] ?? null);
+        $jaAplicados = $this->medicamentosAplicadosDoItem($item);
+
+        $todosAplicados = true;
+
+        foreach (($item->combo?->itens ?? collect()) as $componente) {
+            // Componente já aplicado num atendimento anterior não é relido
+            if ($jaAplicados->contains((int) $componente->medicamento_id)) {
+                continue;
+            }
+
+            $dados = $informados[$componente->id] ?? [];
+            $nome = $componente->medicamento?->nome ?? $item->nome;
+            $obs = filled($dados['observacao'] ?? null) ? $dados['observacao'] : $observacao;
+
+            if (filter_var($dados['pendente'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                $todosAplicados = false;
+
+                continue;
+            }
+
+            $quantidade = $item->quantidadeDoComponente($componente);
+
+            if ($quantidade <= 0) {
+                throw ValidationException::withMessages([
+                    'itens' => 'A quantidade de '.$nome.' precisa ser maior que zero.',
+                ]);
+            }
+
+            $lote = $this->resolverLoteDoComponente(
+                $nome,
+                (int) $componente->medicamento_id,
+                $dados['codigo_barras'] ?? null,
+                $clinicaId
+            );
+
+            if ($quantidade > (float) $lote->saldo_clinica + 0.001) {
+                throw ValidationException::withMessages([
+                    'itens' => 'O lote '.$lote->lote.' tem apenas '.(int) $lote->saldo_clinica
+                        .' unidade(s) — não dá para aplicar '.Numero::formatar($quantidade).' de '.$nome.'.',
+                ]);
+            }
+
+            $this->registrarAplicacaoEmLote($atendimento, $semana, $item, $lote, $quantidade, $aplicadoEm, $obs, $nome, $clinicaId);
+        }
+
+        $item->update([
+            'status' => $todosAplicados ? StatusSemanaItem::Aplicado : StatusSemanaItem::Pendente,
+            'observacao' => $observacao ?? $item->observacao,
+        ]);
+
+        if (! $todosAplicados) {
+            PrescricaoLog::registrar(
+                $semana->prescricao_id,
+                TipoLogPrescricao::ItemPendente,
+                $item->nome.' com medicamento(s) pendente(s) (combo incompleto).',
+                ['detalhes' => array_filter([
+                    'Combo' => $item->nome,
+                    'Quantidade prevista' => $item->quantidade_formatada,
+                    'Motivo' => $observacao,
+                ])],
+                $semana->id
+            );
+        }
+    }
+
+    /**
+     * Medicamentos de um combo que já foram aplicados (em qualquer atendimento).
+     *
+     * @return Collection<int, int>
+     */
+    private function medicamentosAplicadosDoItem(PrescricaoSemanaItem $item): Collection
+    {
+        return PrescricaoSemanaAplicacao::query()
+            ->where('prescricao_semana_item_id', $item->id)
+            ->whereNotNull('medicamento_id')
+            ->pluck('medicamento_id')
+            ->map(fn ($id) => (int) $id);
+    }
+
+    /**
+     * Lote de um componente do combo: o código de barras precisa ter saldo na
+     * clínica, ser do medicamento do componente e não estar vencido.
+     */
+    private function resolverLoteDoComponente(string $nome, int $medicamentoId, $codigo, int $clinicaId): EntradaItem
+    {
+        $codigo = trim((string) $codigo);
+
+        if ($codigo === '') {
+            throw ValidationException::withMessages([
+                'itens' => 'Informe o código de barras de '.$nome.'.',
+            ]);
+        }
+
+        $lotes = EntradaItem::lotesComSaldo($codigo, $clinicaId);
+
+        if ($lotes->isEmpty()) {
+            throw ValidationException::withMessages([
+                'itens' => 'Código de barras '.$codigo.' sem saldo nesta clínica.',
+            ]);
+        }
+
+        $doMedicamento = $lotes->filter(fn (EntradaItem $lote) => (int) $lote->medicamento_id === $medicamentoId);
+
+        if ($doMedicamento->isEmpty()) {
+            throw ValidationException::withMessages([
+                'itens' => 'O código de barras '.$codigo.' é de '
+                    .($lotes->first()->medicamento?->nome ?? 'outro medicamento').', não de '.$nome.'.',
+            ]);
+        }
+
+        $validos = $doMedicamento->reject(fn (EntradaItem $lote) => $lote->esta_vencido);
+
+        if ($validos->isEmpty()) {
+            $vencido = $doMedicamento->first();
+
+            throw ValidationException::withMessages([
+                'itens' => 'O lote '.$vencido->lote.' do código '.$codigo.' está vencido (venc. '
+                    .($vencido->vencimento_formatado ?? '—').') e não pode ser aplicado.',
+            ]);
+        }
+
+        return $validos->first();
     }
 
     /**

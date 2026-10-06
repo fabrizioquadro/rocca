@@ -72,6 +72,30 @@ class PrescricaoSemanaItem extends Model
     }
 
     /**
+     * Aplicações já registradas neste item (em qualquer atendimento).
+     */
+    public function aplicacoes()
+    {
+        return $this->hasMany(PrescricaoSemanaAplicacao::class, 'prescricao_semana_item_id');
+    }
+
+    /**
+     * Quantidade de um medicamento do combo: a quantidade prescrita do combo
+     * vezes a quantidade do medicamento no combo. Como no medicamento avulso,
+     * ampola não tem fração (arredonda para cima).
+     */
+    public function quantidadeDoComponente(ComboItem $componente): float
+    {
+        $quantidade = round((float) $this->quantidade_cobranca * (float) $componente->quantidade, 3);
+
+        if ($componente->medicamento?->tipo === TipoMedicamento::Ampola) {
+            return (float) ceil($quantidade);
+        }
+
+        return $quantidade;
+    }
+
+    /**
      * Quantidade que será cobrada: ampola não tem fração (0,5 cobra 1).
      * Miligrama, procedimento e combo cobram a quantidade exata.
      */
