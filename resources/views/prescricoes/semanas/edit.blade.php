@@ -76,7 +76,7 @@
         <div id="area-itens" class="{{ old('sem_aplicacao', $semana->sem_aplicacao) ? 'd-none' : '' }}">
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
             <h6 class="fw-semibold mb-0">Medicamentos / Combos</h6>
-            <span class="text-muted small">O valor vem do cadastro do medicamento/combo.</span>
+            <span class="text-muted small">O valor vem do cadastro do medicamento/combo e pode ser alterado.</span>
           </div>
 
           <div class="table-responsive">
@@ -157,6 +157,20 @@
         return 'R$ ' + partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + partes[1];
       };
 
+      // Número -> texto do campo de moeda (ex.: 180 -> '180,00')
+      const numeroParaCampoMoeda = (numero) => {
+        const partes = Number(numero || 0).toFixed(2).split('.');
+
+        return partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + ',' + partes[1];
+      };
+
+      // Texto do campo de moeda -> número (mesma regra da máscara: centavos)
+      const moedaParaNumero = (texto) => {
+        const digitos = String(texto || '').replace(/\D/g, '');
+
+        return digitos ? parseInt(digitos, 10) / 100 : 0;
+      };
+
       const valorDaOpcao = (select) => {
         const opcao = select ? select.options[select.selectedIndex] : null;
 
@@ -195,6 +209,8 @@
         totalSemana.textContent = formatarMoeda(total);
       };
 
+      // Alterna medicamento/combo e recalcula o total a partir do campo de
+      // valor (que o usuário pode ter alterado).
       const atualizarLinha = (linha) => {
         const ehCombo = linha.querySelector('[data-tipo-item]').value === 'combo';
         const selectMedicamento = linha.querySelector('[data-select-medicamento]');
@@ -206,11 +222,8 @@
         selectMedicamento.disabled = ehCombo;
         selectCombo.disabled = !ehCombo;
 
-        const valor = valorDaOpcao(ehCombo ? selectCombo : selectMedicamento);
-
-        linha.querySelector('[data-valor-item]').value = formatarMoeda(valor);
-
         const quantidade = paraNumero(linha.querySelector('[data-qtd-item]').value);
+        const valor = moedaParaNumero(linha.querySelector('[data-valor-item]').value);
         const total = quantidadeCobrada(linha, quantidade) * valor;
         const celulaTotal = linha.querySelector('[data-total-item]');
 
@@ -220,16 +233,49 @@
         atualizarTotais();
       };
 
+      // Escolheu um medicamento/combo: o valor volta a ser o do cadastro
+      const aplicarValorDoCadastro = (linha) => {
+        const ehCombo = linha.querySelector('[data-tipo-item]').value === 'combo';
+        const select = linha.querySelector(ehCombo ? '[data-select-combo]' : '[data-select-medicamento]');
+        const valor = valorDaOpcao(select);
+
+        linha.querySelector('[data-valor-item]').value = valor > 0 ? numeroParaCampoMoeda(valor) : '';
+      };
+
       const prepararLinha = (linha) => {
-        linha.querySelector('[data-tipo-item]').addEventListener('change', () => atualizarLinha(linha));
-        linha.querySelector('[data-select-medicamento]').addEventListener('change', () => atualizarLinha(linha));
-        linha.querySelector('[data-select-combo]').addEventListener('change', () => atualizarLinha(linha));
-        linha.querySelector('[data-qtd-item]').addEventListener('input', () => atualizarLinha(linha));
+        const campoTipo = linha.querySelector('[data-tipo-item]');
+        const selectMedicamento = linha.querySelector('[data-select-medicamento]');
+        const selectCombo = linha.querySelector('[data-select-combo]');
+        const campoQtd = linha.querySelector('[data-qtd-item]');
+        const campoValor = linha.querySelector('[data-valor-item]');
+
+        // Trocar tipo/medicamento/combo recarrega o valor do cadastro;
+        // quantidade e valor digitados apenas recalculam o total.
+        campoTipo.addEventListener('change', () => {
+          atualizarLinha(linha);
+          aplicarValorDoCadastro(linha);
+          atualizarLinha(linha);
+        });
+        selectMedicamento.addEventListener('change', () => {
+          aplicarValorDoCadastro(linha);
+          atualizarLinha(linha);
+        });
+        selectCombo.addEventListener('change', () => {
+          aplicarValorDoCadastro(linha);
+          atualizarLinha(linha);
+        });
+        campoQtd.addEventListener('input', () => atualizarLinha(linha));
+        campoValor.addEventListener('input', () => atualizarLinha(linha));
 
         linha.querySelector('[data-remover-item]').addEventListener('click', function () {
           linha.remove();
           atualizarTotais();
         });
+
+        // Máscara de moeda no campo de valor (linhas criadas depois do load)
+        if (typeof window.inicializarMascaras === 'function') {
+          window.inicializarMascaras(linha);
+        }
 
         atualizarLinha(linha);
       };

@@ -12,9 +12,15 @@
 
   $medicamentoEscolhido = $medicamentoId ? $medicamentos->firstWhere('id', $medicamentoId) : null;
 
-  $valor = $ehCombo
+  // Valor do cadastro (ponto de partida do campo)
+  $valorCadastro = $ehCombo
       ? (float) ($combos->firstWhere('id', $comboId)?->valor_total ?? 0)
       : (float) ($medicamentoEscolhido?->valor_venda ?? 0);
+
+  // O valor informado na tela (alterado pelo usuário) tem prioridade
+  $valorInformado = $item['valor'] ?? null;
+  $valor = filled($valorInformado) ? \App\Support\Numero::paraFloat($valorInformado) : $valorCadastro;
+  $valorTexto = ($valorInformado !== null || $valor > 0) ? number_format($valor, 2, ',', '.') : '';
 
   // Ampola não tem fração (0,5 cobra 1), igual à regra da gravação
   $quantidadeCobranca = ($medicamentoEscolhido?->tipo === \App\Enums\TipoMedicamento::Ampola)
@@ -86,12 +92,13 @@
   <td>
     <input
       type="text"
+      name="itens[{{ $indice }}][valor]"
       class="form-control form-control-sm"
-      readonly
-      tabindex="-1"
-      title="O valor vem do cadastro do medicamento/combo"
-      placeholder="R$ 0,00"
-      value="{{ 'R$ '.number_format($valor, 2, ',', '.') }}"
+      inputmode="numeric"
+      title="O valor vem do cadastro; pode ser alterado"
+      placeholder="0,00"
+      value="{{ $valorTexto }}"
+      data-moeda
       data-valor-item />
   </td>
 

@@ -424,9 +424,10 @@
               type="text"
               name="semanas[__INDICE_SEMANA__][itens][__INDICE_ITEM__][valor]"
               class="form-control form-control-sm"
-              readonly
-              title="O valor vem do cadastro do medicamento/combo"
-              placeholder="R$ 0,00" />
+              inputmode="numeric"
+              title="O valor vem do cadastro; pode ser alterado"
+              placeholder="0,00"
+              data-moeda />
           </td>
           <td class="text-end fw-semibold" data-total-item>R$ 0,00</td>
           <td class="text-center">
@@ -585,9 +586,10 @@
         <input
           type="text"
           class="form-control form-control-sm"
-          readonly
-          title="O valor vem do cadastro do medicamento/combo"
-          placeholder="R$ 0,00"
+          inputmode="numeric"
+          title="O valor vem do cadastro; pode ser alterado"
+          placeholder="0,00"
+          data-moeda
           data-gerador-valor />
       </td>
       <td class="text-end fw-semibold" data-total-item>R$ 0,00</td>

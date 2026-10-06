@@ -149,6 +149,7 @@ class PrescricaoSemanaController extends Controller
             'itens.*.medicamento_id' => ['nullable', 'integer', 'exists:medicamentos,id'],
             'itens.*.combo_id' => ['nullable', 'integer', 'exists:combos,id'],
             'itens.*.quantidade' => ['nullable'],
+            'itens.*.valor' => ['nullable'],
         ]);
 
         DB::transaction(function () use ($prescricao, $semana, $dados) {
@@ -616,6 +617,7 @@ class PrescricaoSemanaController extends Controller
                 'medicamento_id' => $item->medicamento_id,
                 'combo_id' => $item->combo_id,
                 'quantidade' => $item->quantidade,
+                'valor' => $item->valor,
             ])
             ->values()
             ->all();

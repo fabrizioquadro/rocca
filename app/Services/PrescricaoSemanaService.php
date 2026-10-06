@@ -42,8 +42,10 @@ class PrescricaoSemanaService
     }
 
     /**
-     * Normaliza os itens vindos do formulário (o valor vem sempre do cadastro).
-     * Devolve também se algum item exige anexo (prescrição médica).
+     * Normaliza os itens vindos do formulário. O valor pode vir informado na
+     * tela (alterado pelo usuário); sem ele, usa o do cadastro (medicamento:
+     * valor de venda / combo: soma dos itens). Devolve também se algum item
+     * exige anexo (prescrição médica).
      *
      * @param  array<int, array<string, mixed>>  $itens
      * @return array{itens: array<int, array<string, mixed>>, exige_anexo: bool}
@@ -83,7 +85,7 @@ class PrescricaoSemanaService
                     'medicamento_id' => null,
                     'combo_id' => $combo->id,
                     'quantidade' => $quantidade,
-                    'valor' => (float) $combo->valor_total,
+                    'valor' => $this->valorDoItem($item['valor'] ?? null, (float) $combo->valor_total),
                     'gera_aplicacao' => $geraAplicacao,
                     'status' => $geraAplicacao ? StatusSemanaItem::Aberto : StatusSemanaItem::Aplicado,
                 ];
@@ -108,7 +110,7 @@ class PrescricaoSemanaService
                 'medicamento_id' => $medicamento->id,
                 'combo_id' => null,
                 'quantidade' => $quantidade,
-                'valor' => (float) $medicamento->valor_venda,
+                'valor' => $this->valorDoItem($item['valor'] ?? null, (float) $medicamento->valor_venda),
                 'gera_aplicacao' => $geraAplicacao,
                 'status' => $geraAplicacao ? StatusSemanaItem::Aberto : StatusSemanaItem::Aplicado,
             ];
@@ -137,6 +139,21 @@ class PrescricaoSemanaService
     public function normalizarNumero($valor): float
     {
         return Numero::paraFloat($valor);
+    }
+
+    /**
+     * Valor do item: o informado na tela quando houver; em branco, usa o do
+     * cadastro. Aceita "1.234,56", "180.00" e ignora símbolos como "R$".
+     */
+    private function valorDoItem($informado, float $doCadastro): float
+    {
+        if (blank($informado)) {
+            return round($doCadastro, 2);
+        }
+
+        $texto = preg_replace('/[^\d.,-]/', '', (string) $informado);
+
+        return max(0, round($this->normalizarNumero($texto), 2));
     }
 
     /**
