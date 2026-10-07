@@ -195,8 +195,11 @@ class PrescricaoSemanaService
      * A semana com aplicação parcial também entra: o paciente voltou para
      * completar a aplicação. Nesse caso a regra sequencial não se aplica (a
      * semana já saiu do agendamento muito antes).
+     *
+     * Enviando uma semana atrasada, $remanejar desloca as semanas seguintes na
+     * mesma quantidade de dias do atraso.
      */
-    public function enviarParaFilaDeAtendimento(PrescricaoSemana $semana, ?string $email, ?string $senha): void
+    public function enviarParaFilaDeAtendimento(PrescricaoSemana $semana, ?string $email, ?string $senha, bool $remanejar = false): void
     {
         $parcial = $semana->status === StatusSemana::AplicacaoParcial;
 
@@ -212,6 +215,10 @@ class PrescricaoSemanaService
                 'semana' => $semana->motivo_bloqueio_fila,
             ]);
         }
+
+        // A semana atrasada pode empurrar as seguintes: o resto do tratamento
+        // acompanha a aplicação de hoje (data prevista + vencimento das parcelas)
+        $this->remanejarSemanasSeguintes($semana, $remanejar);
 
         // Parcela paga ou nada a cobrar (semana sem valor): segue direto, sem
         // autorização de administrador
@@ -254,6 +261,47 @@ class PrescricaoSemanaService
             ])],
             $semana->id
         );
+    }
+
+    /**
+     * Empurra as semanas seguintes na mesma quantidade de dias que esta semana
+     * está atrasada: o tratamento segue o mesmo intervalo a partir da aplicação
+     * de hoje. O financeiro acompanha (vencimento das parcelas).
+     */
+    private function remanejarSemanasSeguintes(PrescricaoSemana $semana, bool $remanejar): void
+    {
+        if (! $remanejar) {
+            return;
+        }
+
+        $atraso = $semana->dias_de_atraso;
+        $semanas = $semana->semanas_seguintes_para_remanejar;
+
+        if ($atraso <= 0 || $semanas->isEmpty()) {
+            return;
+        }
+
+        $detalhes = [];
+
+        foreach ($semanas as $seguinte) {
+            $de = $seguinte->data_prevista->copy();
+            $para = $de->copy()->addDays($atraso);
+
+            $detalhes['Semana '.$seguinte->numero] = $de->format('d/m/Y').' para '.$para->format('d/m/Y');
+
+            $seguinte->update(['data_prevista' => $para]);
+        }
+
+        PrescricaoLog::registrar(
+            $semana->prescricao_id,
+            TipoLogPrescricao::Remanejamento,
+            'Semanas seguintes remanejadas em '.$atraso.' dia(s) pelo atraso da semana '
+                .$semana->numero.' ('.$semana->data_prevista->format('d/m/Y').').',
+            ['detalhes' => $detalhes],
+            $semana->id
+        );
+
+        $this->sincronizarFinanceiro($semana->prescricao->refresh());
     }
 
     /**

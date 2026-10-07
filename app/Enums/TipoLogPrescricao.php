@@ -25,6 +25,7 @@ enum TipoLogPrescricao: string
     case AnexoRemovido = 'anexo_removido';
     case Observacao = 'observacao';
     case Exclusao = 'exclusao';
+    case Remanejamento = 'remanejamento';
     case FeegowEnviado = 'feegow_enviado';
     case FeegowErro = 'feegow_erro';
 
@@ -49,6 +50,7 @@ enum TipoLogPrescricao: string
             self::AnexoRemovido => 'Anexo removido',
             self::Observacao => 'Observação registrada',
             self::Exclusao => 'Prescrição excluída',
+            self::Remanejamento => 'Semanas remanejadas',
             self::FeegowEnviado => 'Registrado na Feegow',
             self::FeegowErro => 'Erro no envio para a Feegow',
         };
@@ -62,7 +64,7 @@ enum TipoLogPrescricao: string
         return match ($this) {
             self::Criacao, self::SemanaCriada, self::AnexoEnviado, self::Observacao => 'bg-label-primary',
             self::Aplicacao, self::PagamentoRegistrado, self::AtendimentoFinalizado => 'bg-label-success',
-            self::SemanaEditada, self::FinanceiroAjustado, self::ItemPendente => 'bg-label-warning',
+            self::SemanaEditada, self::FinanceiroAjustado, self::ItemPendente, self::Remanejamento => 'bg-label-warning',
             self::SemanaExcluida, self::Exclusao, self::PagamentoRemovido, self::AnexoRemovido => 'bg-label-danger',
             self::EnvioFila, self::AtendimentoIniciado, self::VasilhameAberto, self::FeegowEnviado => 'bg-label-info',
             self::FeegowErro => 'bg-label-danger',
@@ -80,6 +82,7 @@ enum TipoLogPrescricao: string
             self::SemanaCriada => 'ri-calendar-event-line',
             self::SemanaEditada => 'ri-edit-line',
             self::SemanaExcluida, self::Exclusao => 'ri-delete-bin-7-line',
+            self::Remanejamento => 'ri-drag-move-2-line',
             self::EnvioFila => 'ri-play-list-add-line',
             self::Devolucao => 'ri-arrow-go-back-line',
             self::AtendimentoIniciado => 'ri-play-circle-line',

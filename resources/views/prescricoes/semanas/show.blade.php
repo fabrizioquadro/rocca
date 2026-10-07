@@ -40,8 +40,10 @@
             <form
               method="POST"
               action="{{ route('prescricoes.semanas.fila', [$prescricao, $semana]) }}"
+              data-fila-remanejar="{{ json_encode($semana->remanejamento) }}"
               data-confirmar="Enviar a semana {{ $semana->numero }} para a fila de atendimento?">
               @csrf
+              <input type="hidden" name="remanejar" value="0">
               <button type="submit" class="btn btn-info">
                 <i class="ri-play-list-add-line me-1"></i>Enviar para Fila de Atendimento
               </button>
@@ -187,8 +189,12 @@
               administrador — fica registrado quem liberou.
             </p>
 
-            <form method="POST" action="{{ route('prescricoes.semanas.fila', [$prescricao, $semana]) }}">
+            <form
+              method="POST"
+              action="{{ route('prescricoes.semanas.fila', [$prescricao, $semana]) }}"
+              data-fila-remanejar="{{ json_encode($semana->remanejamento) }}">
               @csrf
+              <input type="hidden" name="remanejar" value="0">
 
               <div class="row g-3 align-items-end">
                 <div class="col-md-4">
@@ -571,4 +577,5 @@
 
 @push('scripts')
   @include('partials.crud-scripts')
+  @include('prescricoes._modal-remanejar')
 @endpush

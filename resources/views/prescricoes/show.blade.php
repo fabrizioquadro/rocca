@@ -329,9 +329,11 @@
                               <form
                                 method="POST"
                                 action="{{ route('prescricoes.semanas.fila', [$prescricao, $semana]) }}"
+                                data-fila-remanejar="{{ json_encode($semana->remanejamento) }}"
                                 data-confirmar="Enviar a semana {{ $semana->numero }} para a fila de aplicação?">
                                 @csrf
                                 <input type="hidden" name="origem" value="semanas">
+                                <input type="hidden" name="remanejar" value="0">
                                 <button type="submit" class="dropdown-item text-info">
                                   <i class="ri-play-list-add-line me-2"></i>Enviar para Fila de Aplicação
                                 </button>
@@ -935,6 +937,7 @@
 
 @push('scripts')
   @include('partials.crud-scripts')
+  @include('prescricoes._modal-remanejar')
 
   <script>
     // Parcelas do cartão/link só aparecem nas formas que parcelam

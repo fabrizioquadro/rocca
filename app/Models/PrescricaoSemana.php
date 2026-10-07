@@ -402,6 +402,63 @@ class PrescricaoSemana extends Model
     }
 
     /**
+     * Dias de atraso da semana: hoje menos a data prevista. Zero quando a
+     * semana não tem data prevista ou ainda não venceu.
+     */
+    public function getDiasDeAtrasoAttribute(): int
+    {
+        if (! $this->data_prevista) {
+            return 0;
+        }
+
+        $hoje = now()->startOfDay();
+        $prevista = $this->data_prevista->startOfDay();
+
+        if ($prevista->greaterThanOrEqualTo($hoje)) {
+            return 0;
+        }
+
+        return (int) $prevista->diffInDays($hoje);
+    }
+
+    /**
+     * Semanas seguintes que acompanham o atraso desta: as que ainda não
+     * entraram em atendimento e têm data prevista (aplicada não volta atrás).
+     */
+    public function getSemanasSeguintesParaRemanejarAttribute(): Collection
+    {
+        return $this->prescricao->semanas
+            ->filter(fn (PrescricaoSemana $semana) => $semana->numero > $this->numero
+                && $semana->data_prevista !== null
+                && in_array($semana->status, [StatusSemana::Agendada, StatusSemana::FilaAplicacao], true))
+            ->sortBy('numero')
+            ->values();
+    }
+
+    /**
+     * Proposta de remanejamento exibida ao enviar a semana atrasada para a
+     * fila: o atraso em dias e as novas datas das semanas seguintes.
+     *
+     * @return array{atraso: int, semanas: array<int, array{numero: int, de: string, para: string}>}
+     */
+    public function getRemanejamentoAttribute(): array
+    {
+        $atraso = $this->dias_de_atraso;
+
+        $semanas = $atraso > 0
+            ? $this->semanas_seguintes_para_remanejar
+                ->map(fn (PrescricaoSemana $semana) => [
+                    'numero' => (int) $semana->numero,
+                    'de' => $semana->data_prevista->format('d/m/Y'),
+                    'para' => $semana->data_prevista->copy()->addDays($atraso)->format('d/m/Y'),
+                ])
+                ->all()
+            : [];
+
+        return ['atraso' => $semanas ? $atraso : 0, 'semanas' => $semanas];
+    }
+
+    /**
      * Resumo da semana para o histórico (chave => valor).
      *
      * @return array<string, string>

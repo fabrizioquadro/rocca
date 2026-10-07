@@ -313,6 +313,10 @@ class PrescricaoSemanaController extends Controller
      * Envia a semana para a fila de atendimento. Exige a parcela paga; sem
      * pagamento, precisa da autorização (email + senha) de um administrador,
      * que fica registrada na semana.
+     *
+     * Quando a semana está atrasada, o formulário pergunta se as semanas
+     * seguintes devem ser remanejadas (remanejar=1); a tela já mostrou as
+     * novas datas da proposta.
      */
     public function enviarParaFila(Request $request, Prescricao $prescricao, PrescricaoSemana $semana)
     {
@@ -321,28 +325,39 @@ class PrescricaoSemanaController extends Controller
         $dados = $request->validate([
             'liberacao_email' => ['nullable', 'email'],
             'liberacao_senha' => ['nullable', 'string'],
+            'remanejar' => ['nullable', 'boolean'],
         ], [
             'liberacao_email.email' => 'Informe um email válido do administrador.',
         ]);
 
-        DB::transaction(function () use ($semana, $dados) {
+        $remanejar = (bool) ($dados['remanejar'] ?? false);
+        $atraso = $semana->remanejamento['atraso'];
+
+        DB::transaction(function () use ($semana, $dados, $remanejar) {
             $this->semanas->enviarParaFilaDeAtendimento(
                 $semana,
                 $dados['liberacao_email'] ?? null,
-                $dados['liberacao_senha'] ?? null
+                $dados['liberacao_senha'] ?? null,
+                $remanejar
             );
         });
+
+        $mensagem = 'Semana enviada para a fila de atendimento.';
+
+        if ($remanejar && $atraso > 0) {
+            $mensagem .= ' As semanas seguintes foram remanejadas em '.$atraso.' dia(s).';
+        }
 
         // Enviada pela aba Semanas da prescrição: o usuário continua por lá
         if ($request->input('origem') === 'semanas') {
             return redirect()
                 ->route('prescricoes.show', ['prescricao' => $prescricao, 'aba' => 'semanas'])
-                ->with('success', 'Semana enviada para a fila de atendimento.');
+                ->with('success', $mensagem);
         }
 
         return redirect()
             ->route('prescricoes.semanas.show', [$prescricao, $semana])
-            ->with('success', 'Semana enviada para a fila de atendimento.');
+            ->with('success', $mensagem);
     }
 
     /**
