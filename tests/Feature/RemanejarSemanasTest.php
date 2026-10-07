@@ -135,7 +135,8 @@ class RemanejarSemanasTest extends TestCase
         $datasAntes = $this->datasDasSemanas($prescricao, $alvo);
 
         // A tela da semana mostra a proposta no formulário de envio (JSON lido pelo JS)
-        $propostaJson = json_encode($alvo->remanejamento);
+        $proposta = $alvo->remanejamento;
+        $propostaJson = json_encode($proposta);
 
         $this->actingAs($usuario)
             ->get(route('prescricoes.semanas.show', [$prescricao, $alvo]))
@@ -177,6 +178,14 @@ class RemanejarSemanasTest extends TestCase
             'prescricao_semana_id' => $alvo->id,
             'acao' => 'remanejamento',
         ]);
+
+        // O histórico da prescrição mostra o remanejamento com as datas novas
+        $this->actingAs($usuario)
+            ->get(route('prescricoes.show', ['prescricao' => $prescricao, 'aba' => 'logs']))
+            ->assertOk()
+            ->assertSee('Semanas remanejadas')
+            ->assertSee('Semanas seguintes remanejadas em '.self::ATRASO)
+            ->assertSee($proposta['semanas'][0]['de'].' para '.$proposta['semanas'][0]['para']);
     }
 
     public function test_envio_de_semana_atrasada_sem_remanejar_mantem_as_datas(): void
