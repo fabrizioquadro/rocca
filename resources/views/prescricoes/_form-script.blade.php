@@ -117,6 +117,8 @@
     let prescricaoAberta = null;
     let consultaAberta = { pacienteId: null, promessa: null };
     let abertaConfirmada = false;
+    let verificandoAberta = false;   // verificação "prescrição em aberto" em andamento
+    let envioEmAndamento = false;    // o formulário já foi enviado de verdade
 
     const mostrarAvisoAberta = () => {
       if (!avisoAberta || !avisoAbertaTexto) return;
@@ -1172,10 +1174,33 @@
       // listener roda DEPOIS do do anexo (por isso o event.defaultPrevented) e
       // o reenvio usa requestSubmit(), que dispara o evento de novo — assim a
       // regra do anexo e a validacao do navegador continuam valendo.
+      //
+      // A verificacao e assincrona: sem as travas abaixo, um clique repetido no
+      // "Salvar" fazia este callback rodar 2x (a consulta usa a mesma promise)
+      // e o formulario era enviado duas vezes, cadastrando a prescricao em
+      // duplicidade. Agora o envio acontece uma unica vez.
       formularioPrescricao.addEventListener('submit', (event) => {
-        if (abertaConfirmada || event.defaultPrevented) return;
+        if (event.defaultPrevented) return;
+
+        // Confirmacao ja feita: e o envio de verdade — deixa passar UMA vez
+        if (abertaConfirmada && !envioEmAndamento) {
+          envioEmAndamento = true;
+
+          window.setTimeout(() => {
+            formularioPrescricao.querySelectorAll('button[type="submit"]').forEach((botao) => {
+              botao.disabled = true;
+            });
+          }, 0);
+
+          return;
+        }
 
         event.preventDefault();
+
+        // Envio ja disparado ou verificacao em andamento (clique repetido)
+        if (envioEmAndamento || verificandoAberta) return;
+
+        verificandoAberta = true;
 
         consultarPrescricaoAberta(pacienteSelect ? pacienteSelect.value : '').then((aberta) => {
           const continuar = !aberta || window.confirm(
@@ -1184,7 +1209,11 @@
             + 'Deseja cadastrar uma nova prescrição mesmo assim?'
           );
 
-          if (!continuar) return;
+          if (!continuar) {
+            verificandoAberta = false;
+
+            return;
+          }
 
           abertaConfirmada = true;
 
