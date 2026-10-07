@@ -308,22 +308,37 @@
     <div class="modal fade" id="modal-abrir-vasilhame" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
-          <form
-            method="POST"
-            action="{{ route('prescricoes.semanas.vasilhames.store', [$prescricao, $semana]) }}"
-            id="form-abrir-vasilhame">
-            @csrf
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="ri-archive-2-line me-1"></i>Abrir vasilhame</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
 
-            <div class="modal-header">
-              <h5 class="modal-title"><i class="ri-archive-2-line me-1"></i>Abrir vasilhame</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-            </div>
+          <div class="modal-body">
+            <p class="text-muted small mb-3">
+              Ao abrir, o vasilhame sai do estoque fechado e passa a ter o saldo em mg, que as aplicações
+              vão consumindo até zerar. Pode-se abrir mais de um vasilhame do mesmo medicamento.
+            </p>
 
-            <div class="modal-body">
-              <p class="text-muted small mb-3">
-                Ao abrir, o vasilhame sai do estoque fechado e passa a ter o saldo em mg, que as aplicações
-                vão consumindo até zerar. Pode-se abrir mais de um vasilhame do mesmo medicamento.
-              </p>
+            {{-- Erro do envio anterior: com o modal aberto o aviso do topo da página
+                 fica escondido, então ele reaparece aqui --}}
+            @if ($errors->has('vasilhame') || $errors->has('medicamento_id') || $errors->has('codigo_barras'))
+              <div class="alert alert-danger py-2" role="alert">
+                @foreach (['vasilhame', 'medicamento_id', 'codigo_barras'] as $campo)
+                  @foreach ($errors->get($campo) as $mensagem)
+                    {{ $mensagem }}<br />
+                  @endforeach
+                @endforeach
+              </div>
+            @endif
+
+            {{-- O formulário fica DENTRO do corpo do modal: envolvendo o conteúdo
+                 (header/body/footer) ele quebra o layout do Bootstrap e o botão
+                 de abrir sai da área visível em telas mais baixas --}}
+            <form
+              method="POST"
+              action="{{ route('prescricoes.semanas.vasilhames.store', [$prescricao, $semana]) }}"
+              id="form-abrir-vasilhame">
+              @csrf
 
               <div class="row g-3">
                 <div class="col-md-6">
@@ -370,46 +385,47 @@
                     value="{{ old('observacao') }}" />
                 </div>
               </div>
+            </form>
 
-              @if ($vasilhamesAbertos->isNotEmpty())
-                <h6 class="fw-semibold mt-4 mb-2">Vasilhames abertos desta aplicação</h6>
+            @if ($vasilhamesAbertos->isNotEmpty())
+              <h6 class="fw-semibold mt-4 mb-2">Vasilhames abertos desta aplicação</h6>
 
-                <div class="table-responsive">
-                  <table class="table table-sm table-bordered align-middle mb-0">
-                    <thead class="table-light">
+              <div class="table-responsive">
+                <table class="table table-sm table-bordered align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Medicamento</th>
+                      <th>Código de barras</th>
+                      <th>Lote</th>
+                      <th>Vencimento</th>
+                      <th class="text-end">Restam</th>
+                      <th>Aberto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @foreach ($vasilhamesAbertos as $vasilhame)
                       <tr>
-                        <th>Medicamento</th>
-                        <th>Código de barras</th>
-                        <th>Lote</th>
-                        <th>Vencimento</th>
-                        <th class="text-end">Restam</th>
-                        <th>Aberto</th>
+                        <td>{{ $vasilhame->medicamento?->nome ?? '—' }}</td>
+                        <td class="font-monospace">{{ $vasilhame->codigo_barras ?? '—' }}</td>
+                        <td>{{ $vasilhame->lote ?? '—' }}</td>
+                        <td>{{ $vasilhame->vencimento_formatado ?? '—' }}</td>
+                        <td class="text-end fw-semibold">{{ $vasilhame->mg_restantes_formatado }}</td>
+                        <td class="small text-body-secondary">{{ $vasilhame->descricao_abertura }}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      @foreach ($vasilhamesAbertos as $vasilhame)
-                        <tr>
-                          <td>{{ $vasilhame->medicamento?->nome ?? '—' }}</td>
-                          <td class="font-monospace">{{ $vasilhame->codigo_barras ?? '—' }}</td>
-                          <td>{{ $vasilhame->lote ?? '—' }}</td>
-                          <td>{{ $vasilhame->vencimento_formatado ?? '—' }}</td>
-                          <td class="text-end fw-semibold">{{ $vasilhame->mg_restantes_formatado }}</td>
-                          <td class="small text-body-secondary">{{ $vasilhame->descricao_abertura }}</td>
-                        </tr>
-                      @endforeach
-                    </tbody>
-                  </table>
-                </div>
-              @endif
+                    @endforeach
+                  </tbody>
+                </table>
+              </div>
+            @endif
             </div>
 
             <div class="modal-footer">
               <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fechar</button>
-              <button type="submit" class="btn btn-info">
+              {{-- Fica fora do formulário (que está no corpo do modal), ligado pelo atributo form --}}
+              <button type="submit" class="btn btn-info" form="form-abrir-vasilhame">
                 <i class="ri-lock-unlock-line me-1"></i>Abrir vasilhame
               </button>
             </div>
-          </form>
         </div>
       </div>
     </div>

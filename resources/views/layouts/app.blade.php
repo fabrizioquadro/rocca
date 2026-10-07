@@ -48,6 +48,23 @@
       .table.table-sm thead tr th {
         padding-block: 0.6rem;
       }
+
+      /* Modal com o conteúdo dentro de um <form> (header/body/footer como filhos do
+         form): o Bootstrap espera esses blocos como filhos diretos do .modal-content.
+         Sem isso o corpo do modal não rola e o rodapé — com o botão de confirmar —
+         fica fora da área visível em telas mais baixas (Windows com zoom, por ex.).
+         Aqui o formulário passa a se comportar como o .modal-content. */
+      .modal-dialog-scrollable .modal-content > form {
+        display: flex;
+        flex-direction: column;
+        max-height: 100%;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .modal-dialog-scrollable .modal-content > form > .modal-body {
+        min-height: 0;
+        overflow-y: auto;
+      }
     </style>
 
     @stack('styles')
