@@ -15,6 +15,27 @@
         <a href="{{ route('prescricoes.index') }}" class="btn btn-outline-secondary">
           <i class="ri-arrow-left-line me-1"></i>Voltar
         </a>
+
+        {{-- Excluir prescrição: só administradores e só enquanto nenhuma semana
+             tiver aplicação de Ampola/Miligrama --}}
+        @if (auth()->user()?->ehAdministrador())
+          @if ($prescricao->pode_ser_excluida)
+            <form
+              method="POST"
+              action="{{ route('prescricoes.destroy', $prescricao) }}"
+              data-confirmar="Excluir a prescrição #{{ $prescricao->id }}? As semanas, os itens, as parcelas e o financeiro também serão excluídos.">
+              @csrf
+              @method('DELETE')
+              <button type="submit" class="btn btn-outline-danger">
+                <i class="ri-delete-bin-7-line me-1"></i>Excluir prescrição
+              </button>
+            </form>
+          @else
+            <button type="button" class="btn btn-outline-danger" disabled title="{{ $prescricao->motivo_bloqueio_exclusao }}">
+              <i class="ri-lock-line me-1"></i>Excluir prescrição
+            </button>
+          @endif
+        @endif
       </div>
     </div>
 
@@ -346,7 +367,7 @@
                               </span>
                             @endif
 
-                            @if ($semana->pode_ser_alterada)
+                            @if ($semana->pode_ser_excluida)
                               <form
                                 method="POST"
                                 action="{{ route('prescricoes.semanas.destroy', [$prescricao, $semana]) }}"
@@ -358,7 +379,7 @@
                                 </button>
                               </form>
                             @else
-                              <span class="dropdown-item disabled text-danger" title="{{ $semana->motivo_bloqueio }}">
+                              <span class="dropdown-item disabled text-danger" title="{{ $semana->motivo_bloqueio_exclusao }}">
                                 <i class="ri-lock-line me-2"></i>Excluir
                               </span>
                             @endif

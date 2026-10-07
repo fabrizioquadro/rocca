@@ -263,10 +263,20 @@ class PrescricaoController extends Controller
     }
 
     /**
-     * Exclui a prescrição (e o financeiro).
+     * Exclui a prescrição (e o financeiro). Só administradores — a rota também
+     * está protegida pelo middleware perfil:administrador. Bloqueado quando
+     * alguma semana já tem aplicação de Ampola/Miligrama.
      */
     public function destroy(Prescricao $prescricao)
     {
+        if (! auth()->user()?->ehAdministrador()) {
+            return back()->with('error', 'Só administradores podem excluir uma prescrição.');
+        }
+
+        if (! $prescricao->pode_ser_excluida) {
+            return back()->with('error', $prescricao->motivo_bloqueio_exclusao);
+        }
+
         DB::transaction(function () use ($prescricao) {
             $prescricao->load(['semanas.itens', 'anexos', 'financeiro']);
 

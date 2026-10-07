@@ -226,8 +226,12 @@ class PrescricaoSemanaController extends Controller
     {
         $this->garantirSemanaDaPrescricao($prescricao, $semana);
 
-        if ($bloqueio = $this->bloqueioDeAlteracao($prescricao, $semana)) {
-            return $bloqueio;
+        // Exclusão liberada para todos os perfis, mas bloqueada quando a semana
+        // já tem aplicação de Ampola/Miligrama (a exclusão as apagaria junto).
+        if (! $semana->pode_ser_excluida) {
+            return redirect()
+                ->route('prescricoes.show', $prescricao)
+                ->with('error', $semana->motivo_bloqueio_exclusao);
         }
 
         DB::transaction(function () use ($prescricao, $semana) {

@@ -62,10 +62,17 @@ class User extends Authenticatable
     }
 
     /**
+     * O usuário é administrador?
+     */
+    public function ehAdministrador(): bool
+    {
+        return $this->tipo === TipoUsuario::Administrador;
+    }
+
+    /**
      * Rota inicial do usuário conforme o seu perfil.
      */
-    public function rotaInicial(): string
-    {
+    public function rotaInicial(): string    {
         return match ($this->tipo) {
             TipoUsuario::Secretaria => 'secretaria.index',
             TipoUsuario::Enfermagem => 'enfermagem.index',

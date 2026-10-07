@@ -108,10 +108,20 @@
           <a href="{{ route('prescricoes.semanas.edit', [$prescricao, $semana]) }}" class="btn btn-primary">
             <i class="ri-edit-line me-1"></i>Editar semana
           </a>
+        @else
+          {{-- Semana que já entrou no fluxo de aplicação não pode ser editada --}}
+          <button type="button" class="btn btn-primary" disabled title="{{ $semana->motivo_bloqueio }}">
+            <i class="ri-lock-line me-1"></i>Editar semana
+          </button>
+        @endif
+
+        {{-- Excluir vale para todos os perfis; bloqueia só quando já houve
+             aplicação de Ampola/Miligrama --}}
+        @if ($semana->pode_ser_excluida)
           <form
             method="POST"
             action="{{ route('prescricoes.semanas.destroy', [$prescricao, $semana]) }}"
-            data-confirmar="Excluir esta semana? Os itens e a parcela vinculada também serão excluídos.">
+            data-confirmar="Excluir a semana {{ $semana->numero }}? Os itens e a parcela vinculada também serão excluídos.">
             @csrf
             @method('DELETE')
             <button type="submit" class="btn btn-outline-danger">
@@ -119,11 +129,7 @@
             </button>
           </form>
         @else
-          {{-- Semana que já entrou no fluxo de aplicação não pode ser alterada --}}
-          <button type="button" class="btn btn-primary" disabled title="{{ $semana->motivo_bloqueio }}">
-            <i class="ri-lock-line me-1"></i>Editar semana
-          </button>
-          <button type="button" class="btn btn-outline-danger" disabled title="{{ $semana->motivo_bloqueio }}">
+          <button type="button" class="btn btn-outline-danger" disabled title="{{ $semana->motivo_bloqueio_exclusao }}">
             <i class="ri-lock-line me-1"></i>Excluir
           </button>
         @endif

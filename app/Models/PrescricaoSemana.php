@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\StatusSemana;
 use App\Enums\StatusSemanaItem;
+use App\Enums\TipoMedicamento;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -219,6 +220,50 @@ class PrescricaoSemana extends Model
         }
 
         return 'Semana '.$this->status->label().' — só pode ser alterada enquanto não há aplicação.';
+    }
+
+    /**
+     * A semana já tem aplicação de medicamento do tipo Ampola/Miligrama?
+     * Essas aplicações consomem estoque e ficam registradas: com elas lançadas
+     * a semana (e a prescrição) não podem mais ser excluídas.
+     */
+    public function getTemAplicacaoAmpolaMiligramaAttribute(): bool
+    {
+        $ids = $this->itens->pluck('id');
+
+        if ($ids->isEmpty()) {
+            return false;
+        }
+
+        return PrescricaoSemanaAplicacao::query()
+            ->whereIn('prescricao_semana_item_id', $ids)
+            ->whereHas('medicamento', fn ($query) => $query->whereIn('tipo', [
+                TipoMedicamento::Ampola->value,
+                TipoMedicamento::Miligrama->value,
+            ]))
+            ->exists();
+    }
+
+    /**
+     * A semana pode ser excluída? Só enquanto não houver aplicação de
+     * Ampola/Miligrama — a exclusão apaga as aplicações e não dá para desfazer.
+     * Aplicação de procedimento (Bio/Coleta) não bloqueia.
+     */
+    public function getPodeSerExcluidaAttribute(): bool
+    {
+        return ! $this->tem_aplicacao_ampola_miligrama;
+    }
+
+    /**
+     * Explicação do bloqueio da exclusão, para exibir no tooltip da tela.
+     */
+    public function getMotivoBloqueioExclusaoAttribute(): ?string
+    {
+        if ($this->pode_ser_excluida) {
+            return null;
+        }
+
+        return 'Semana com aplicação de Ampola/Miligrama — a exclusão apagaria essas aplicações.';
     }
 
     /**

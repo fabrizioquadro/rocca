@@ -261,6 +261,41 @@ class Prescricao extends Model
     }
 
     /**
+     * Alguma semana já tem aplicação de Ampola/Miligrama? (essas aplicações
+     * consomem estoque e não podem ser apagadas)
+     */
+    public function getTemAplicacaoAmpolaMiligramaAttribute(): bool
+    {
+        return $this->semanas->contains(
+            fn (PrescricaoSemana $semana) => $semana->tem_aplicacao_ampola_miligrama
+        );
+    }
+
+    /**
+     * A prescrição pode ser excluída? Só enquanto nenhuma semana tiver
+     * aplicação de Ampola/Miligrama (a exclusão levaria as aplicações junto).
+     * Aplicação de procedimento (Bio/Coleta) não bloqueia.
+     */
+    public function getPodeSerExcluidaAttribute(): bool
+    {
+        return ! $this->tem_aplicacao_ampola_miligrama;
+    }
+
+    /**
+     * Explicação do bloqueio da exclusão, para exibir no tooltip da tela.
+     */
+    public function getMotivoBloqueioExclusaoAttribute(): ?string
+    {
+        $semana = $this->semanas->first(fn (PrescricaoSemana $item) => ! $item->pode_ser_excluida);
+
+        if (! $semana) {
+            return null;
+        }
+
+        return 'A semana '.$semana->numero.' tem aplicação de Ampola/Miligrama — a exclusão apagaria essas aplicações.';
+    }
+
+    /**
      * Situação da prescrição, DERIVADA das semanas (nunca gravada no banco):
      * mostra o estágio mais avançado que ainda está em andamento.
      *

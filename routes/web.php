@@ -201,7 +201,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/prescricoes/pacientes/{paciente}/aberta', [PrescricaoController::class, 'prescricaoAberta'])->name('prescricoes.paciente-aberta');
     Route::post('/prescricoes', [PrescricaoController::class, 'store'])->name('prescricoes.store');
     Route::get('/prescricoes/{prescricao}', [PrescricaoController::class, 'show'])->name('prescricoes.show');
-    Route::delete('/prescricoes/{prescricao}', [PrescricaoController::class, 'destroy'])->name('prescricoes.destroy');
+    Route::delete('/prescricoes/{prescricao}', [PrescricaoController::class, 'destroy'])->middleware('perfil:administrador')->name('prescricoes.destroy');
 
     // Anexos da prescrição (exames, receitas, documentos e etc.)
     Route::post('/prescricoes/{prescricao}/anexos', [PrescricaoController::class, 'storeAnexo'])->name('prescricoes.anexos.store');
