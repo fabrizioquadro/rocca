@@ -164,6 +164,7 @@ class PrescricaoController extends Controller
             'logs.user',
             'semanas.itens.medicamento',
             'semanas.itens.combo',
+            'semanas.itens.aplicacoes',
             'semanas.parcelas',
             'financeiro.parcelas.semana',
             'financeiro.pagamentos.user',

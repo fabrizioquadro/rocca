@@ -2,12 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Enums\FormaPagamento;
 use App\Enums\StatusSemana;
 use App\Enums\TipoUsuario;
 use App\Models\Prescricao;
 use App\Models\PrescricaoSemana;
+use App\Models\PrescricaoSemanaItem;
 use App\Models\User;
+use App\Services\FinanceiroPagamentoService;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Collection;
 use Tests\TestCase;
 
 class RemanejarSemanasTest extends TestCase
@@ -17,17 +21,31 @@ class RemanejarSemanasTest extends TestCase
     private const ATRASO = 5;
 
     /**
-     * Prescrição com semanas agendadas e itens: é o cenário real do
-     * remanejamento (capítulos seguintes ainda por aplicar).
+     * Prescrição com pelo menos 4 semanas "limpas" (com itens e sem nenhuma
+     * aplicação registrada): é o cenário do remanejamento, as semanas que
+     * ainda estão por aplicar.
      */
     private function prescricaoAgendada(): ?Prescricao
     {
-        return Prescricao::with(['semanas.parcelas', 'semanas.itens'])
+        return Prescricao::with(['semanas.parcelas', 'semanas.itens.aplicacoes'])
             ->orderByDesc('id')
             ->get()
-            ->first(fn (Prescricao $prescricao) => $prescricao->semanas->count() >= 4
-                && $prescricao->semanas->every(fn (PrescricaoSemana $semana) => $semana->status === StatusSemana::Agendada
-                    && $semana->itens->isNotEmpty()));
+            ->first(fn (Prescricao $prescricao) => $this->semanasLimpa($prescricao)->count() >= 4);
+    }
+
+    /**
+     * Semanas sem nenhuma aplicação registrada — são as que o remanejamento
+     * pode deslocar (as já aplicadas ficam como estão).
+     *
+     * @return Collection<int, PrescricaoSemana>
+     */
+    private function semanasLimpa(Prescricao $prescricao): Collection
+    {
+        return $prescricao->semanas
+            ->filter(fn (PrescricaoSemana $semana) => $semana->itens->isNotEmpty()
+                && $semana->itens->every(fn (PrescricaoSemanaItem $item) => $item->aplicacoes->isEmpty()))
+            ->sortBy(fn (PrescricaoSemana $semana) => (int) $semana->numero)
+            ->values();
     }
 
     private function administrador(): ?User
@@ -36,29 +54,48 @@ class RemanejarSemanasTest extends TestCase
     }
 
     /**
-     * Deixa a primeira semana com ATRASO dias de atraso e a parcela quitada
-     * (envio liberado sem senha de administrador).
+     * As semanas limpas voltam para "Agendada" e a primeira delas fica com
+     * ATRASO dias de atraso. As semanas já aplicadas continuam como estão.
      */
     private function prepararCenario(Prescricao $prescricao): PrescricaoSemana
     {
-        $alvo = $prescricao->semanas->sortBy('numero')->first();
+        $semanas = $this->semanasLimpa($prescricao);
 
-        $alvo->update([
+        $semanas->each(fn (PrescricaoSemana $semana) => $semana->update([
             'status' => StatusSemana::Agendada,
-            'data_prevista' => now()->startOfDay()->subDays(self::ATRASO),
+            'sem_aplicacao' => false,
             'chegada_em' => null,
             'liberado_por_user_id' => null,
             'liberado_em' => null,
-        ]);
+        ]));
 
-        $parcela = $alvo->parcelas()->first();
+        $alvo = $semanas->first();
 
-        if ($parcela) {
-            $parcela->valor_pago = $parcela->valor;
-            $parcela->save();
-        }
+        $alvo->update(['data_prevista' => now()->startOfDay()->subDays(self::ATRASO)]);
 
         return $alvo->refresh();
+    }
+
+    /**
+     * Recebe o valor em aberto do financeiro (como a Secretária faz na tela):
+     * sem isso o envio para a fila exigiria a senha de um administrador.
+     * O "pago" de cada parcela é recalculado a partir dos recebimentos.
+     */
+    private function quitarFinanceiro(Prescricao $prescricao, User $usuario): void
+    {
+        $financeiro = $prescricao->financeiro()->first();
+        $aberto = $financeiro ? (float) $financeiro->valor_aberto : 0;
+
+        if (! $financeiro || $aberto <= 0) {
+            return;
+        }
+
+        $this->actingAs($usuario);
+
+        app(FinanceiroPagamentoService::class)->registrar($financeiro, [
+            'valor' => $aberto,
+            'forma_pagamento' => FormaPagamento::Dinheiro->value,
+        ]);
     }
 
     /**
@@ -66,7 +103,7 @@ class RemanejarSemanasTest extends TestCase
      */
     private function datasDasSemanas(Prescricao $prescricao, PrescricaoSemana $alvo): array
     {
-        return $prescricao->semanas
+        return $this->semanasLimpa($prescricao)
             ->filter(fn (PrescricaoSemana $semana) => $semana->numero > $alvo->numero && $semana->data_prevista)
             ->mapWithKeys(fn (PrescricaoSemana $semana) => [$semana->id => $semana->data_prevista->toDateString()])
             ->all();
@@ -81,9 +118,8 @@ class RemanejarSemanasTest extends TestCase
         }
 
         $alvo = $this->prepararCenario($prescricao);
-        $seguintes = $prescricao->semanas
+        $seguintes = $this->semanasLimpa($prescricao)
             ->filter(fn (PrescricaoSemana $semana) => $semana->numero > $alvo->numero && $semana->data_prevista)
-            ->sortBy('numero')
             ->values();
 
         $this->assertSame(self::ATRASO, $alvo->dias_de_atraso);
@@ -132,6 +168,7 @@ class RemanejarSemanasTest extends TestCase
         }
 
         $alvo = $this->prepararCenario($prescricao);
+        $this->quitarFinanceiro($prescricao, $usuario);
         $datasAntes = $this->datasDasSemanas($prescricao, $alvo);
 
         // A tela da semana mostra a proposta no formulário de envio (JSON lido pelo JS)
@@ -198,6 +235,7 @@ class RemanejarSemanasTest extends TestCase
         }
 
         $alvo = $this->prepararCenario($prescricao);
+        $this->quitarFinanceiro($prescricao, $usuario);
         $datasAntes = $this->datasDasSemanas($prescricao, $alvo);
 
         $this->actingAs($usuario)
@@ -233,6 +271,7 @@ class RemanejarSemanasTest extends TestCase
         }
 
         $alvo = $this->prepararCenario($prescricao);
+        $this->quitarFinanceiro($prescricao, $usuario);
 
         $alvo->update(['data_prevista' => now()->startOfDay()]);
 

@@ -7,6 +7,7 @@ use App\Enums\StatusSemanaItem;
 use App\Enums\TipoMedicamento;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 class PrescricaoSemana extends Model
@@ -197,6 +198,37 @@ class PrescricaoSemana extends Model
     public function getTemAplicacaoAttribute(): bool
     {
         return $this->itens->contains(fn (PrescricaoSemanaItem $item) => $item->gera_aplicacao);
+    }
+
+    /**
+     * Datas em que a semana foi aplicada, sem repetir e em ordem. Mais de uma
+     * quando o paciente voltou em outro dia para completar a aplicação.
+     *
+     * @return Collection<int, Carbon>
+     */
+    public function getDatasDeAplicacaoAttribute(): Collection
+    {
+        return $this->itens
+            ->flatMap(fn (PrescricaoSemanaItem $item) => $item->aplicacoes)
+            ->pluck('aplicado_em')
+            ->filter()
+            ->map(fn (Carbon $data) => $data->copy()->startOfDay())
+            ->unique(fn (Carbon $data) => $data->toDateString())
+            ->sortBy(fn (Carbon $data) => $data->toDateString())
+            ->values();
+    }
+
+    /**
+     * Data de aplicação formatada (d/m/Y). Nula quando a semana ainda não teve
+     * aplicação; com dois dias, as duas datas separadas por "·".
+     */
+    public function getDataAplicacaoFormatadaAttribute(): ?string
+    {
+        $datas = $this->datas_de_aplicacao
+            ->map(fn (Carbon $data) => $data->format('d/m/Y'))
+            ->all();
+
+        return $datas ? implode(' · ', $datas) : null;
     }
 
     /**

@@ -297,6 +297,7 @@
                     <th style="width: 60px;" class="text-center"></th>
                     <th style="width: 90px;">Semana</th>
                     <th style="width: 150px;">Data prevista</th>
+                    <th style="width: 150px;">Data de aplicação</th>
                     <th>Situação</th>
                     <th style="width: 150px;" class="text-end">Valor</th>
                     <th style="width: 180px;">Pagamento</th>
@@ -390,6 +391,8 @@
                       </td>
                       <td class="fw-semibold">{{ $semana->numero }}/{{ $prescricao->quantidade_semanas }}</td>
                       <td>{{ $semana->data_prevista_formatada ?? '—' }}</td>
+                      {{-- Data de aplicação: quando a semana foi aplicada de fato --}}
+                      <td>{{ $semana->data_aplicacao_formatada ?? '—' }}</td>
                       <td>
                         {{-- Semana sem aplicação mostra apenas o aviso, sem o status --}}
                         @if ($semana->sem_aplicacao)
@@ -415,7 +418,7 @@
                 </tbody>
                 <tfoot>
                   <tr>
-                    <th colspan="4" class="text-end">Total das semanas</th>
+                    <th colspan="5" class="text-end">Total das semanas</th>
                     <th class="text-end">{{ $prescricao->valor_total_formatado }}</th>
                     <th></th>
                   </tr>
