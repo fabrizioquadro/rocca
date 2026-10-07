@@ -7,6 +7,7 @@ use App\Enums\TipoAtendimento;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 class Prescricao extends Model
@@ -237,6 +238,27 @@ class Prescricao extends Model
         return $semana?->data_prevista
             ? (int) $semana->data_prevista->startOfDay()->diffInDays(now()->startOfDay())
             : 0;
+    }
+
+    /**
+     * Data da próxima aplicação: a semana agendada mais antiga (a aplicação é
+     * sequencial). Null quando não há semana agendada com data prevista.
+     */
+    public function getProximaAplicacaoAttribute(): ?Carbon
+    {
+        return $this->semanas
+            ->filter(fn (PrescricaoSemana $semana) => $semana->status === StatusSemana::Agendada
+                && $semana->data_prevista !== null)
+            ->sortBy(fn (PrescricaoSemana $semana) => (int) $semana->numero)
+            ->first()?->data_prevista;
+    }
+
+    /**
+     * Data da próxima aplicação formatada (d/m/Y).
+     */
+    public function getProximaAplicacaoFormatadaAttribute(): ?string
+    {
+        return $this->proxima_aplicacao?->format('d/m/Y');
     }
 
     /**

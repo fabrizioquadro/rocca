@@ -34,7 +34,7 @@
               <th>Médico</th>
               <th>Clínica</th>
               <th>Tipo de atendimento</th>
-              <th>Agendamento</th>
+              <th>Data Aplicação</th>
               <th class="text-center">Semanas</th>
               <th>Situação</th>
               <th class="text-end">Valor total</th>
@@ -93,7 +93,10 @@
                 </td>
                 <td>{{ $prescricao->clinica?->nome ?? '—' }}</td>
                 <td>{{ $prescricao->tipo_atendimento?->label() ?? '—' }}</td>
-                <td>{{ $prescricao->agendamento ?? '—' }}</td>
+                {{-- Data Aplicação: a data prevista da semana agendada mais antiga --}}
+                <td data-order="{{ $prescricao->proxima_aplicacao?->toDateString() }}">
+                  {{ $prescricao->proxima_aplicacao_formatada ?? '—' }}
+                </td>
                 {{-- Progresso: número da última semana aplicada / total de semanas da prescrição --}}
                 <td class="text-center" data-order="{{ $prescricao->ultima_semana_aplicada ?? 0 }}">
                   @if ($prescricao->semanas_com_aplicacao === 0)
