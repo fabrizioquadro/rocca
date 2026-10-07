@@ -3,6 +3,8 @@
 /public/build
 /public/hot
 /public/storage
+# Uploads dos usuários (anexos, imagens): ficam só no servidor
+/public/uploads
 /storage/*.key
 /vendor
 .env
