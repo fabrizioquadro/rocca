@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\FormaPagamento;
 use App\Enums\StatusParcela;
 use App\Enums\StatusSemanaItem;
+use App\Enums\TipoAtendimento;
 use App\Enums\TipoMovimentacaoEstoque;
 use App\Models\BaixaVasilhameItem;
 use App\Models\Clinica;
@@ -12,6 +14,7 @@ use App\Models\EstoqueMovimentacao;
 use App\Models\FinanceiroPagamento;
 use App\Models\FinanceiroParcela;
 use App\Models\Medicamento;
+use App\Models\Paciente;
 use App\Models\Prescricao;
 use App\Models\PrescricaoSemanaAplicacao;
 use App\Models\PrescricaoSemanaItem;
@@ -431,12 +434,43 @@ class RelatorioController extends Controller
         [$inicio, $fim] = $this->periodo($request);
         $clinicaId = (int) $request->input('clinica_id');
 
-        $pagamentos = FinanceiroPagamento::query()
-            ->with(['user', 'financeiro.clinica', 'financeiro.prescricao.paciente'])
+        $medico = trim((string) $request->input('medico'));
+        $formaPagamento = (string) $request->input('forma_pagamento');
+        $tipoAtendimento = (string) $request->input('tipo_atendimento');
+        $pacienteId = (int) $request->input('paciente_id');
+
+        // Base do período/clínica: dela saem a lista de médicos do filtro e os
+        // totais do resumo
+        $base = fn () => FinanceiroPagamento::query()
             ->whereBetween('data_pagamento', [$inicio->toDateString(), $fim->toDateString()])
             ->when($clinicaId, fn ($query) => $query->whereHas(
                 'financeiro',
                 fn ($financeiro) => $financeiro->where('clinica_id', $clinicaId)
+            ));
+
+        $medicos = $base()
+            ->with('financeiro.prescricao:id,medico_nome')
+            ->get()
+            ->pluck('financeiro.prescricao.medico_nome')
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        $pagamentos = $base()
+            ->with(['user', 'financeiro.clinica', 'financeiro.prescricao.paciente'])
+            ->when($medico !== '', fn ($query) => $query->whereHas(
+                'financeiro.prescricao',
+                fn ($prescricao) => $prescricao->where('medico_nome', $medico)
+            ))
+            ->when($formaPagamento !== '', fn ($query) => $query->where('forma_pagamento', $formaPagamento))
+            ->when($tipoAtendimento !== '', fn ($query) => $query->whereHas(
+                'financeiro.prescricao',
+                fn ($prescricao) => $prescricao->where('tipo_atendimento', $tipoAtendimento)
+            ))
+            ->when($pacienteId, fn ($query) => $query->whereHas(
+                'financeiro.prescricao',
+                fn ($prescricao) => $prescricao->where('paciente_id', $pacienteId)
             ))
             ->orderBy('data_pagamento')
             ->get();
@@ -450,7 +484,12 @@ class RelatorioController extends Controller
 
         return view('relatorios.recebimentos', array_merge(
             $this->dadosComuns($request),
-            compact('pagamentos', 'totalRecebido', 'porForma')
+            compact('pagamentos', 'totalRecebido', 'porForma', 'medicos'),
+            [
+                'formasPagamento' => FormaPagamento::opcoes(),
+                'tiposAtendimento' => TipoAtendimento::opcoes(),
+                'pacienteFiltrado' => $pacienteId ? Paciente::find($pacienteId) : null,
+            ]
         ));
     }
 

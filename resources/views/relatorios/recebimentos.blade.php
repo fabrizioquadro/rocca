@@ -11,6 +11,10 @@
     <x-slot:filtros>
       @include('relatorios.partials.filtros', [
         'rota' => route('relatorios.recebimentos'),
+        'comMedico' => true,
+        'comFormaPagamento' => true,
+        'comAtendimento' => true,
+        'comPaciente' => true,
       ])
     </x-slot:filtros>
 
@@ -94,6 +98,40 @@
   </x-relatorio>
 @endsection
 
+@push('styles')
+  <link rel="stylesheet" href="{{ asset('template/assets/vendor/libs/select2/select2.css') }}" />
+@endpush
+
 @push('scripts')
+  <script src="{{ asset('template/assets/vendor/libs/select2/select2.js') }}"></script>
+  <script>
+    window.recebimentosPacientesUrl = '{{ route('prescricoes.pacientes') }}';
+
+    // Paciente do filtro: a base é grande, então a escolha é por busca
+    document.addEventListener('DOMContentLoaded', function () {
+      if (! window.jQuery || ! jQuery.fn.select2) return;
+
+      jQuery('#paciente_id').select2({
+        width: '100%',
+        placeholder: 'Digite para buscar o paciente...',
+        allowClear: true,
+        minimumInputLength: 3,
+        language: {
+          inputTooShort: () => 'Digite pelo menos 3 letras',
+          noResults: () => 'Nenhum paciente encontrado',
+          searching: () => 'Buscando...'
+        },
+        ajax: {
+          url: window.recebimentosPacientesUrl,
+          dataType: 'json',
+          delay: 300,
+          cache: true,
+          data: (params) => ({ busca: params.term }),
+          processResults: (data) => data
+        }
+      });
+    });
+  </script>
+
   @include('partials.crud-scripts')
 @endpush

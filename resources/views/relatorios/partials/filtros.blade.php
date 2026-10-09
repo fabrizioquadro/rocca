@@ -1,7 +1,8 @@
 {{--
   Filtros padrão dos relatórios.
   Variáveis: $rota (obrigatória), $comPeriodo, $comClinica, $comMedicamento,
-  $comTipo, $comVencidas, $rotuloPeriodo.
+  $comTipo, $comVencidas, $comMedico, $comFormaPagamento, $comAtendimento,
+  $comPaciente, $rotuloPeriodo.
 --}}
 <form method="GET" action="{{ $rota }}" class="relatorio-filtros row g-3 align-items-end">
   @if ($comPeriodo ?? true)
@@ -40,6 +41,60 @@
             {{ $medicamento->nome }}
           </option>
         @endforeach
+      </select>
+    </div>
+  @endif
+
+  @if ($comMedico ?? false)
+    <div class="col-md-3">
+      <label class="form-label" for="medico">Médico</label>
+      <select id="medico" name="medico" class="form-select">
+        <option value="">Todos os médicos</option>
+        @foreach ($medicos as $nomeMedico)
+          <option value="{{ $nomeMedico }}" @selected(request('medico') === $nomeMedico)>
+            {{ $nomeMedico }}
+          </option>
+        @endforeach
+      </select>
+    </div>
+  @endif
+
+  @if ($comFormaPagamento ?? false)
+    <div class="col-md-3">
+      <label class="form-label" for="forma_pagamento">Forma de pagamento</label>
+      <select id="forma_pagamento" name="forma_pagamento" class="form-select">
+        <option value="">Todas as formas</option>
+        @foreach ($formasPagamento as $valorForma => $rotuloForma)
+          <option value="{{ $valorForma }}" @selected(request('forma_pagamento') === $valorForma)>
+            {{ $rotuloForma }}
+          </option>
+        @endforeach
+      </select>
+    </div>
+  @endif
+
+  @if ($comAtendimento ?? false)
+    <div class="col-md-3">
+      <label class="form-label" for="tipo_atendimento">Tipo de atendimento</label>
+      <select id="tipo_atendimento" name="tipo_atendimento" class="form-select">
+        <option value="">Todos os atendimentos</option>
+        @foreach ($tiposAtendimento as $valorTipo => $rotuloTipo)
+          <option value="{{ $valorTipo }}" @selected(request('tipo_atendimento') === $valorTipo)>
+            {{ $rotuloTipo }}
+          </option>
+        @endforeach
+      </select>
+    </div>
+  @endif
+
+  {{-- Paciente: a base é grande, então a escolha é por busca (Select2 + AJAX) --}}
+  @if ($comPaciente ?? false)
+    <div class="col-md-3">
+      <label class="form-label" for="paciente_id">Paciente</label>
+      <select id="paciente_id" name="paciente_id" class="form-select">
+        @if ($pacienteFiltrado)
+          <option value="{{ $pacienteFiltrado->id }}" selected>{{ $pacienteFiltrado->nome }}</option>
+        @endif
       </select>
     </div>
   @endif
