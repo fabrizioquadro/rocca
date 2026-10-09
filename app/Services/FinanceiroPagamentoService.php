@@ -28,6 +28,59 @@ class FinanceiroPagamentoService
      */
     public function registrar(Financeiro $financeiro, array $dados): FinanceiroPagamento
     {
+        $dados = $this->normalizar($dados);
+
+        $pagamento = $financeiro->pagamentos()->create([
+            'valor' => $dados['valor'],
+            'identificador' => $dados['identificador'],
+            'forma_pagamento' => $dados['forma_pagamento'],
+            'parcelas' => $dados['parcelas'],
+            'data_pagamento' => $dados['data_pagamento'],
+            'observacao' => $dados['observacao'],
+            'user_id' => auth()->id(),
+        ]);
+
+        $this->reprocessar($financeiro);
+
+        return $pagamento;
+    }
+
+    /**
+     * Corrige um pagamento já lançado (valor, forma, parcelas, data, ID e
+     * observação) e redistribui o recebido nas parcelas. Quem registrou
+     * originalmente é mantido.
+     *
+     * @param  array{valor?: mixed, forma_pagamento?: mixed, parcelas?: mixed, data_pagamento?: mixed, observacao?: ?string, identificador?: ?string}  $dados
+     */
+    public function atualizar(FinanceiroPagamento $pagamento, array $dados): FinanceiroPagamento
+    {
+        $dados = $this->normalizar($dados, $pagamento);
+
+        $pagamento->update([
+            'valor' => $dados['valor'],
+            'identificador' => $dados['identificador'],
+            'forma_pagamento' => $dados['forma_pagamento'],
+            'parcelas' => $dados['parcelas'],
+            'data_pagamento' => $dados['data_pagamento'],
+            'observacao' => $dados['observacao'],
+        ]);
+
+        if ($financeiro = $pagamento->financeiro) {
+            $this->reprocessar($financeiro);
+        }
+
+        return $pagamento;
+    }
+
+    /**
+     * Valida e normaliza os dados do pagamento. O que não vier no formulário
+     * mantém o valor atual (usado na edição).
+     *
+     * @param  array<string, mixed>  $dados
+     * @return array{valor: float, identificador: ?string, forma_pagamento: string, parcelas: int, data_pagamento: string, observacao: ?string}
+     */
+    private function normalizar(array $dados, ?FinanceiroPagamento $pagamento = null): array
+    {
         $valor = round(Numero::paraFloat($dados['valor'] ?? null), 2);
 
         if ($valor <= 0) {
@@ -36,7 +89,7 @@ class FinanceiroPagamentoService
             ]);
         }
 
-        $forma = FormaPagamento::tryFrom((string) ($dados['forma_pagamento'] ?? ''));
+        $forma = FormaPagamento::tryFrom((string) ($dados['forma_pagamento'] ?? '')) ?? $pagamento?->forma_pagamento;
 
         if (! $forma) {
             throw ValidationException::withMessages([
@@ -57,19 +110,16 @@ class FinanceiroPagamentoService
             $parcelas = 1;
         }
 
-        $pagamento = $financeiro->pagamentos()->create([
+        return [
             'valor' => $valor,
-            'identificador' => filled($dados['identificador'] ?? null) ? trim((string) $dados['identificador']) : null,
+            'identificador' => filled($dados['identificador'] ?? null)
+                ? trim((string) $dados['identificador'])
+                : $pagamento?->identificador,
             'forma_pagamento' => $forma->value,
             'parcelas' => $parcelas,
-            'data_pagamento' => $dados['data_pagamento'] ?? now()->toDateString(),
-            'observacao' => $dados['observacao'] ?? null,
-            'user_id' => auth()->id(),
-        ]);
-
-        $this->reprocessar($financeiro);
-
-        return $pagamento;
+            'data_pagamento' => $dados['data_pagamento'] ?? $pagamento?->data_pagamento?->toDateString() ?? now()->toDateString(),
+            'observacao' => filled($dados['observacao'] ?? null) ? $dados['observacao'] : null,
+        ];
     }
 
     /**

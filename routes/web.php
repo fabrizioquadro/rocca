@@ -242,6 +242,7 @@ Route::middleware('auth')->group(function () {
 
     // Pagamentos do financeiro (alocados da 1ª para a última parcela)
     Route::post('/prescricoes/{prescricao}/pagamentos', [FinanceiroPagamentoController::class, 'store'])->name('prescricoes.pagamentos.store');
+    Route::put('/prescricoes/{prescricao}/pagamentos/{pagamento}', [FinanceiroPagamentoController::class, 'update'])->name('prescricoes.pagamentos.update');
     Route::delete('/prescricoes/{prescricao}/pagamentos/{pagamento}', [FinanceiroPagamentoController::class, 'destroy'])->name('prescricoes.pagamentos.destroy');
 
     // Ajustes do financeiro (desconto, adicional e observação)

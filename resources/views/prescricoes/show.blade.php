@@ -789,16 +789,28 @@
                     <td class="text-muted">{{ $pagamento->observacao ?? '—' }}</td>
                     <td class="text-muted">{{ $pagamento->user?->nome ?? '—' }}</td>
                     <td class="text-center">
-                      <form
-                        method="POST"
-                        action="{{ route('prescricoes.pagamentos.destroy', [$prescricao, $pagamento]) }}"
-                        data-confirmar="Remover este pagamento? As parcelas serão recalculadas.">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="btn btn-sm btn-icon btn-text-danger" title="Remover">
-                          <i class="ri-delete-bin-7-line"></i>
+                      <div class="d-flex justify-content-center gap-1">
+                        {{-- Corrigir valor, forma, data, ID ou observação do pagamento --}}
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-icon btn-text-primary"
+                          data-bs-toggle="modal"
+                          data-bs-target="#modal-editar-pagamento-{{ $pagamento->id }}"
+                          title="Editar pagamento">
+                          <i class="ri-edit-line"></i>
                         </button>
-                      </form>
+
+                        <form
+                          method="POST"
+                          action="{{ route('prescricoes.pagamentos.destroy', [$prescricao, $pagamento]) }}"
+                          data-confirmar="Remover este pagamento? As parcelas serão recalculadas.">
+                          @csrf
+                          @method('DELETE')
+                          <button type="submit" class="btn btn-sm btn-icon btn-text-danger" title="Remover">
+                            <i class="ri-delete-bin-7-line"></i>
+                          </button>
+                        </form>
+                      </div>
                     </td>
                   </tr>
                 @endforeach
@@ -820,6 +832,8 @@
               (crédito a favor do cliente). Ajuste as parcelas ou remova o pagamento.
             </div>
           @endif
+
+          @include('prescricoes._modal-pagamento')
         @endif
       @endif
         </div>

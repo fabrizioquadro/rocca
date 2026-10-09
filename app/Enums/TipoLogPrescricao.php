@@ -20,6 +20,7 @@ enum TipoLogPrescricao: string
     case VasilhameAberto = 'vasilhame_aberto';
     case ItemPendente = 'item_pendente';
     case PagamentoRegistrado = 'pagamento_registrado';
+    case PagamentoEditado = 'pagamento_editado';
     case PagamentoRemovido = 'pagamento_removido';
     case FinanceiroAjustado = 'financeiro_ajustado';
     case AnexoEnviado = 'anexo_enviado';
@@ -46,6 +47,7 @@ enum TipoLogPrescricao: string
             self::VasilhameAberto => 'Vasilhame aberto',
             self::ItemPendente => 'Medicamento pendente',
             self::PagamentoRegistrado => 'Pagamento registrado',
+            self::PagamentoEditado => 'Pagamento alterado',
             self::PagamentoRemovido => 'Pagamento removido',
             self::FinanceiroAjustado => 'Financeiro ajustado',
             self::AnexoEnviado => 'Anexo enviado',
@@ -66,7 +68,7 @@ enum TipoLogPrescricao: string
         return match ($this) {
             self::Criacao, self::SemanaCriada, self::AnexoEnviado, self::Observacao => 'bg-label-primary',
             self::Aplicacao, self::PagamentoRegistrado, self::AtendimentoFinalizado => 'bg-label-success',
-            self::SemanaEditada, self::FinanceiroAjustado, self::ItemPendente, self::Remanejamento, self::Edicao => 'bg-label-warning',
+            self::SemanaEditada, self::FinanceiroAjustado, self::ItemPendente, self::Remanejamento, self::Edicao, self::PagamentoEditado => 'bg-label-warning',
             self::SemanaExcluida, self::Exclusao, self::PagamentoRemovido, self::AnexoRemovido => 'bg-label-danger',
             self::EnvioFila, self::AtendimentoIniciado, self::VasilhameAberto, self::FeegowEnviado => 'bg-label-info',
             self::FeegowErro => 'bg-label-danger',
@@ -94,6 +96,7 @@ enum TipoLogPrescricao: string
             self::VasilhameAberto => 'ri-archive-2-line',
             self::ItemPendente => 'ri-error-warning-line',
             self::PagamentoRegistrado => 'ri-money-dollar-circle-line',
+            self::PagamentoEditado => 'ri-money-dollar-circle-line',
             self::PagamentoRemovido => 'ri-refund-2-line',
             self::FinanceiroAjustado => 'ri-percent-line',
             self::AnexoEnviado => 'ri-attachment-2',
