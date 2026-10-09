@@ -4,28 +4,68 @@ namespace Tests\Feature;
 
 use App\Enums\TipoUsuario;
 use App\Models\Prescricao;
+use App\Models\PrescricaoLog;
 use App\Models\User;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Tests\TestCase;
 
 /**
- * "Imprimir cadastro": prescrição detalhada em uma página, com opção de
- * editar os dados e de gerar o PDF.
+ * Página "Imprimir cadastro": a prescrição inteira em uma página, em cards
+ * (dados, financeiro, semanas com as aplicações, anotações e histórico), com
+ * as edições em modal e o PDF para download.
  */
 class ImprimirCadastroTest extends TestCase
 {
+    use DatabaseTransactions;
+
     private function usuario(): ?User
     {
         return User::where('tipo', TipoUsuario::Administrador->value)->first() ?? User::orderBy('id')->first();
     }
 
+    /**
+     * Prescrição com financeiro e/ou aplicação: é o caso que o cliente usa.
+     */
     private function prescricaoCompleta(): ?Prescricao
     {
-        return Prescricao::with('financeiro')->get()
-            ->sortByDesc(fn (Prescricao $prescricao) => ($prescricao->financeiro ? 1 : 0))
-            ->first(fn (Prescricao $prescricao) => $prescricao->semanas()->exists());
+        return Prescricao::withCount('semanas')->get()
+            ->sortByDesc(fn (Prescricao $prescricao) => ($prescricao->financeiro()->exists() ? 100 : 0)
+                + ($prescricao->semanas()->whereHas('atendimentos')->exists() ? 50 : 0)
+                + $prescricao->semanas_count)
+            ->first(fn (Prescricao $prescricao) => $prescricao->semanas_count > 0);
     }
 
-    public function test_pagina_de_impressao_traz_a_prescricao_detalhada(): void
+    public function test_pagina_traz_os_cards_com_tudo(): void
+    {
+        $usuario = $this->usuario();
+        $prescricao = $this->prescricaoCompleta();
+
+        if (! $usuario || ! $prescricao) {
+            $this->markTestSkipped('Sem usuário ou prescrição na base.');
+        }
+
+        $pagina = $this->actingAs($usuario)->get(route('prescricoes.imprimir', $prescricao));
+
+        $pagina->assertOk();
+
+        // Os cards da página, na ordem pedida pelo cliente
+        $pagina->assertSee('Dados da prescrição')
+            ->assertSee('Financeiro')
+            ->assertSee('Semanas e aplicações')
+            ->assertSee('Anotações / textos')
+            ->assertSee('Histórico da prescrição');
+
+        // Dados da prescrição
+        $pagina->assertSee($prescricao->paciente?->nome ?? '—')
+            ->assertSee('Semana 1/');
+
+        // Ações da página
+        $pagina->assertSee('Gerar PDF')
+            ->assertSee('Imprimir')
+            ->assertSee(route('prescricoes.imprimir.pdf', $prescricao));
+    }
+
+    public function test_dados_e_pagamento_sao_editados_em_modal(): void
     {
         $usuario = $this->usuario();
         $prescricao = $this->prescricaoCompleta();
@@ -37,58 +77,85 @@ class ImprimirCadastroTest extends TestCase
         $pagina = $this->actingAs($usuario)->get(route('prescricoes.imprimir', $prescricao));
 
         $pagina->assertOk()
-            ->assertSee('Imprimir cadastro')
-            ->assertSee('Prescrição #'.$prescricao->id)
-            ->assertSee($prescricao->paciente?->nome ?? '—')
-            ->assertSee('Semana 1/')
-            ->assertSee('Anotações / textos')
-            ->assertSee('Documento gerado pelo sistema');
+            ->assertSee('Editar dados')
+            ->assertSee('modal-editar-prescricao', false)
+            ->assertSee(route('prescricoes.update', $prescricao));
 
-        // As ações da tela: editar os dados, gerar PDF e imprimir
-        $pagina->assertSee('Editar dados')
-            ->assertSee('Gerar PDF')
-            ->assertSee('Imprimir')
-            ->assertSee(route('prescricoes.edit', $prescricao))
-            ->assertSee(route('prescricoes.imprimir.pdf', $prescricao));
+        // Os campos do modal de dados
+        foreach (['medico_id', 'medico_nome', 'clinica_id', 'tipo_atendimento', 'agendamento', 'observacoes'] as $campo) {
+            $pagina->assertSee('name="'.$campo.'"', false);
+        }
 
-        // Botão que abre a tela, na prescrição e na listagem
-        $this->actingAs($usuario)
-            ->get(route('prescricoes.show', $prescricao))
-            ->assertOk()
-            ->assertSee('Imprimir Cadastro')
-            ->assertSee(route('prescricoes.imprimir', $prescricao));
+        $pagamento = $prescricao->financeiro?->pagamentos->first();
 
-        $this->actingAs($usuario)
-            ->get(route('prescricoes.index'))
-            ->assertOk()
-            ->assertSee(route('prescricoes.imprimir', $prescricao));
+        if ($pagamento) {
+            $pagina->assertSee('modal-editar-pagamento-'.$pagamento->id, false)
+                ->assertSee(route('prescricoes.pagamentos.update', [$prescricao, $pagamento]));
+
+            // Os formulários da página voltam para ela depois de salvar
+            $pagina->assertSee('name="origem" value="imprimir"', false);
+        }
     }
 
-    public function test_pagina_mostra_o_financeiro_quando_existe(): void
+    public function test_mostra_quem_aplicou_lote_e_codigo(): void
     {
         $usuario = $this->usuario();
 
-        $prescricao = Prescricao::with(['financeiro.parcelas', 'financeiro.pagamentos'])->get()
-            ->first(fn (Prescricao $prescricao) => $prescricao->financeiro !== null
-                && $prescricao->financeiro->parcelas->isNotEmpty());
+        $prescricao = Prescricao::get()
+            ->first(fn (Prescricao $prescricao) => $prescricao->semanas()
+                ->whereHas('atendimentos.aplicacoes')
+                ->exists());
 
         if (! $usuario || ! $prescricao) {
-            $this->markTestSkipped('Sem prescrição com financeiro na base.');
+            $this->markTestSkipped('Sem prescrição com aplicação registrada na base.');
         }
 
-        $financeiro = $prescricao->financeiro;
+        $aplicacao = $prescricao->semanas()
+            ->with(['atendimentos.aplicacoes.user', 'atendimentos.aplicacoes.medicamento'])
+            ->get()
+            ->flatMap(fn ($semana) => $semana->atendimentos->flatMap->aplicacoes)
+            ->first();
+
+        $this->assertNotNull($aplicacao, 'A prescrição deveria ter aplicação.');
+
+        $pagina = $this->actingAs($usuario)->get(route('prescricoes.imprimir', $prescricao));
+
+        $pagina->assertOk()
+            ->assertSee('Aplicado em')
+            ->assertSee('Quem aplicou')
+            ->assertSee('Lote')
+            ->assertSee('Código de barras');
+
+        if ($aplicacao->user) {
+            $pagina->assertSee($aplicacao->user->nome);
+        }
+
+        if ($aplicacao->lote) {
+            $pagina->assertSee($aplicacao->lote);
+        }
+    }
+
+    public function test_mostra_os_logs_no_fim_da_pagina(): void
+    {
+        $usuario = $this->usuario();
+
+        $prescricao = PrescricaoLog::orderByDesc('id')->first()?->prescricao;
+
+        if (! $usuario || ! $prescricao) {
+            $this->markTestSkipped('Sem prescrição com histórico na base.');
+        }
+
+        $log = PrescricaoLog::where('prescricao_id', $prescricao->id)->latest('id')->first();
 
         $this->actingAs($usuario)
             ->get(route('prescricoes.imprimir', $prescricao))
             ->assertOk()
-            ->assertSee('Financeiro')
-            ->assertSee($financeiro->valor_bruto_formatado)
-            ->assertSee($financeiro->valor_total_formatado)
-            ->assertSee($financeiro->valor_aberto_formatado)
-            ->assertSee('Parcela');
+            ->assertSee('Histórico da prescrição')
+            ->assertSee($log->acao->label())
+            ->assertSee($log->descricao);
     }
 
-    public function test_gera_o_pdf_para_download(): void
+    public function test_gera_o_pdf_completo_para_download(): void
     {
         $usuario = $this->usuario();
         $prescricao = $this->prescricaoCompleta();
@@ -101,16 +168,35 @@ class ImprimirCadastroTest extends TestCase
 
         $resposta->assertOk();
         $this->assertSame('application/pdf', $resposta->headers->get('content-type'));
-        $this->assertStringContainsString('prescricao-'.$prescricao->id, (string) $resposta->headers->get('content-disposition'));
+        $this->assertStringContainsString(
+            'prescricao-'.$prescricao->id,
+            (string) $resposta->headers->get('content-disposition')
+        );
 
-        // O arquivo é um PDF de verdade (assinatura %PDF) e tem conteúdo
+        // PDF de verdade (assinatura %PDF) e com conteúdo
         $conteudo = $resposta->getContent();
 
         $this->assertStringStartsWith('%PDF', $conteudo);
         $this->assertGreaterThan(2000, strlen($conteudo));
     }
 
-    public function test_anotacao_pode_ser_inserida_pela_tela_de_impressao(): void
+    public function test_lista_de_medicos_para_o_modal(): void
+    {
+        $usuario = $this->usuario();
+
+        if (! $usuario) {
+            $this->markTestSkipped('Sem usuário na base.');
+        }
+
+        // Vem da Feegow: se ela estiver fora, volta lista vazia (e o modal
+        // mantém o médico atual)
+        $this->actingAs($usuario)
+            ->getJson(route('prescricoes.medicos'))
+            ->assertOk()
+            ->assertJsonStructure(['medicos']);
+    }
+
+    public function test_editar_pela_pagina_volta_para_ela(): void
     {
         $usuario = $this->usuario();
         $prescricao = $this->prescricaoCompleta();
@@ -119,10 +205,22 @@ class ImprimirCadastroTest extends TestCase
             $this->markTestSkipped('Sem usuário ou prescrição na base.');
         }
 
+        // Com origem=imprimir (modal da página) volta para a página
         $this->actingAs($usuario)
-            ->get(route('prescricoes.imprimir', $prescricao))
-            ->assertOk()
-            ->assertSee('Inserir anotação')
-            ->assertSee(route('prescricoes.observacoes.store', $prescricao));
+            ->put(route('prescricoes.update', $prescricao), [
+                'clinica_id' => $prescricao->clinica_id,
+                'tipo_atendimento' => $prescricao->tipo_atendimento->value,
+                'medico_nome' => $prescricao->medico_nome,
+                'origem' => 'imprimir',
+            ])
+            ->assertRedirect(route('prescricoes.imprimir', $prescricao));
+
+        // Sem origem, continua voltando para a tela da prescrição
+        $this->actingAs($usuario)
+            ->put(route('prescricoes.update', $prescricao), [
+                'clinica_id' => $prescricao->clinica_id,
+                'tipo_atendimento' => $prescricao->tipo_atendimento->value,
+            ])
+            ->assertRedirect(route('prescricoes.show', $prescricao));
     }
 }

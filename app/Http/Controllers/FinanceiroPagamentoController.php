@@ -67,9 +67,7 @@ class FinanceiroPagamentoController extends Controller
             ]),
         ]);
 
-        return redirect()
-            ->route('prescricoes.show', ['prescricao' => $prescricao, 'aba' => 'financeiro'])
-            ->with('success', 'Pagamento registrado e parcelas atualizadas.');
+        return $this->voltarParaPrescricao($request, $prescricao, 'Pagamento registrado e parcelas atualizadas.', 'financeiro');
     }
 
     /**
@@ -127,9 +125,7 @@ class FinanceiroPagamentoController extends Controller
             ],
         ]);
 
-        return redirect()
-            ->route('prescricoes.show', ['prescricao' => $prescricao, 'aba' => 'financeiro'])
-            ->with('success', 'Pagamento atualizado e parcelas recalculadas.');
+        return $this->voltarParaPrescricao($request, $prescricao, 'Pagamento atualizado e parcelas recalculadas.', 'financeiro');
     }
 
     /**
@@ -157,7 +153,7 @@ class FinanceiroPagamentoController extends Controller
     /**
      * Remove um pagamento e recalcula as parcelas.
      */
-    public function destroy(Prescricao $prescricao, FinanceiroPagamento $pagamento)
+    public function destroy(Request $request, Prescricao $prescricao, FinanceiroPagamento $pagamento)
     {
         abort_if($pagamento->financeiro?->prescricao_id !== $prescricao->id, 404);
 
@@ -174,8 +170,6 @@ class FinanceiroPagamentoController extends Controller
 
         $this->pagamentos->excluir($pagamento);
 
-        return redirect()
-            ->route('prescricoes.show', ['prescricao' => $prescricao, 'aba' => 'financeiro'])
-            ->with('success', 'Pagamento removido e parcelas recalculadas.');
+        return $this->voltarParaPrescricao($request, $prescricao, 'Pagamento removido e parcelas recalculadas.', 'financeiro');
     }
 }

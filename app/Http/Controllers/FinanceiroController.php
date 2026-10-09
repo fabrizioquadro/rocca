@@ -73,9 +73,7 @@ class FinanceiroController extends Controller
             }
         });
 
-        return redirect()
-            ->route('prescricoes.show', ['prescricao' => $prescricao, 'aba' => 'financeiro'])
-            ->with('success', 'Financeiro atualizado e parcelas recalculadas.');
+        return $this->voltarParaPrescricao($request, $prescricao, 'Financeiro atualizado e parcelas recalculadas.', 'financeiro');
     }
 
     /**

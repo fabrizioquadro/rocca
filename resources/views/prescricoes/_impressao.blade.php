@@ -141,10 +141,12 @@
       @endif
 
       @php
-        // Aplicações da semana, na ordem: data/hora, item, quantidade, lote e código
+        // Aplicações da semana: o que saiu, quando, de qual lote e quem aplicou
         $aplicacoes = $semana->atendimentos
-            ->flatMap(fn ($atendimento) => $atendimento->aplicacoes->sortBy('aplicado_em'))
-            ->sortBy('aplicado_em')
+            ->flatMap(fn ($atendimento) => $atendimento->aplicacoes
+                ->sortBy('aplicado_em')
+                ->map(fn ($aplicacao) => ['atendimento' => $atendimento, 'aplicacao' => $aplicacao]))
+            ->sortBy(fn ($linha) => $linha['aplicacao']->aplicado_em)
             ->values();
       @endphp
 
@@ -152,45 +154,75 @@
         <table class="imp-tabela">
           <thead>
             <tr>
-              <th style="width: 14%;">Aplicado em</th>
-              <th style="width: 30%;">Medicamento aplicado</th>
-              <th style="width: 12%;" class="imp-centro">Quantidade</th>
-              <th style="width: 16%;">Lote</th>
-              <th style="width: 14%;">Código de barras</th>
-              <th style="width: 14%;">Vencimento</th>
+              <th style="width: 13%;">Aplicado em</th>
+              <th style="width: 24%;">Medicamento aplicado</th>
+              <th style="width: 10%;" class="imp-centro">Quantidade</th>
+              <th style="width: 13%;">Lote</th>
+              <th style="width: 12%;">Código de barras</th>
+              <th style="width: 11%;">Vencimento</th>
+              <th style="width: 17%;">Quem aplicou</th>
             </tr>
           </thead>
           <tbody>
-            @foreach ($aplicacoes as $aplicacao)
+            @foreach ($aplicacoes as $linha)
+              @php $aplicacao = $linha['aplicacao']; @endphp
+
               <tr>
                 <td>{{ $aplicacao->aplicado_em_formatado ?? '—' }}</td>
-                <td>{{ $aplicacao->medicamento?->nome ?? $aplicacao->item?->nome ?? '—' }}</td>
+                <td>
+                  {{ $aplicacao->medicamento?->nome ?? $aplicacao->item?->nome ?? '—' }}
+                  @if ($aplicacao->item && $aplicacao->item->tipo === 'combo')
+                    <span class="imp-obs">(combo {{ $aplicacao->item->nome }})</span>
+                  @endif
+                </td>
                 <td class="imp-centro">
                   {{ $aplicacao->quantidade === null ? '—' : $aplicacao->quantidade_com_unidade }}
                 </td>
                 <td>{{ $rotulo($aplicacao->lote) }}</td>
                 <td>{{ $rotulo($aplicacao->codigo_barras) }}</td>
                 <td>{{ $rotulo($aplicacao->vencimento_formatado) }}</td>
+                <td>{{ $rotulo($aplicacao->user?->nome) }}</td>
               </tr>
             @endforeach
           </tbody>
         </table>
       @endif
 
+      {{-- Chegada, atendimento e quem conduziu --}}
       @php
-        $observacoesDaSemana = $semana->atendimentos->filter(fn ($atendimento) => filled($atendimento->observacao));
+        $atendimentosDaSemana = $semana->atendimentos->sortBy('iniciado_em');
       @endphp
 
-      @if ($observacoesDaSemana->isNotEmpty())
+      @if ($atendimentosDaSemana->isNotEmpty())
         <table class="imp-tabela">
-          <tr>
-            <td class="imp-rotulo" style="width: 20%;">Observação do atendimento</td>
-            <td>
-              @foreach ($observacoesDaSemana as $atendimento)
-                {{ $atendimento->observacao }}@if (! $loop->last)<br />@endif
-              @endforeach
-            </td>
-          </tr>
+          <thead>
+            <tr>
+              <th style="width: 16%;">Chegada</th>
+              <th style="width: 22%;">Atendimento iniciado</th>
+              <th style="width: 22%;">Atendimento finalizado</th>
+              <th style="width: 40%;">Observação do atendimento</th>
+            </tr>
+          </thead>
+          <tbody>
+            @foreach ($atendimentosDaSemana as $atendimento)
+              <tr>
+                <td>{{ $rotulo($atendimento->chegada_em_formatada) }}</td>
+                <td>
+                  {{ $rotulo($atendimento->iniciado_em_formatado) }}
+                  @if ($atendimento->iniciadoPor)
+                    <span class="imp-obs">{{ $atendimento->iniciadoPor->nome }}</span>
+                  @endif
+                </td>
+                <td>
+                  {{ $rotulo($atendimento->finalizado_em_formatada) }}
+                  @if ($atendimento->finalizadoPor)
+                    <span class="imp-obs">{{ $atendimento->finalizadoPor->nome }}</span>
+                  @endif
+                </td>
+                <td>{{ $rotulo($atendimento->observacao) }}</td>
+              </tr>
+            @endforeach
+          </tbody>
         </table>
       @endif
     </div>
@@ -350,6 +382,52 @@
               <td class="imp-centro">{{ $anexo->tamanho_formatado }}</td>
               <td>{{ $rotulo($anexo->created_at?->format('d/m/Y H:i')) }}</td>
               <td>{{ $rotulo($anexo->user?->nome) }}</td>
+            </tr>
+          @endforeach
+        </tbody>
+      </table>
+    </div>
+  @endif
+
+  {{-- Histórico: tudo o que aconteceu na prescrição --}}
+  @if ($prescricao->logs->isNotEmpty())
+    <div class="imp-bloco">
+      <table class="imp-tabela imp-titulo-bloco">
+        <tr>
+          <td><strong>Histórico</strong></td>
+          <td class="imp-situacao">{{ $prescricao->logs->count() }} registro(s)</td>
+        </tr>
+      </table>
+
+      <table class="imp-tabela">
+        <thead>
+          <tr>
+            <th style="width: 14%;">Data</th>
+            <th style="width: 16%;">Usuário</th>
+            <th style="width: 17%;">Evento</th>
+            <th>Descrição</th>
+          </tr>
+        </thead>
+        <tbody>
+          @foreach ($prescricao->logs->sortByDesc('created_at') as $log)
+            <tr>
+              <td>{{ $rotulo($log->created_at?->format('d/m/Y H:i')) }}</td>
+              <td>{{ $rotulo($log->user?->nome) }}</td>
+              <td>
+                {{ $log->acao->label() }}
+                @if ($log->semana)
+                  <span class="imp-obs">(semana {{ $log->semana->numero }})</span>
+                @endif
+              </td>
+              <td>
+                {{ $log->descricao }}
+
+                @foreach ($log->alteracoes as $alteracao)
+                  <div class="imp-obs">
+                    {{ $alteracao['campo'] }}: {{ $alteracao['de'] }} → {{ $alteracao['para'] }}
+                  </div>
+                @endforeach
+              </td>
             </tr>
           @endforeach
         </tbody>

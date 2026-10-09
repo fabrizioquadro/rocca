@@ -233,9 +233,7 @@ class PrescricaoController extends Controller
             }
         });
 
-        return redirect()
-            ->route('prescricoes.show', $prescricao)
-            ->with('success', 'Prescrição atualizada com sucesso.');
+        return $this->voltarParaPrescricao($request, $prescricao, 'Prescrição atualizada com sucesso.');
     }
 
     /**
@@ -250,13 +248,19 @@ class PrescricaoController extends Controller
             'user',
             'anexos.user',
             'observacoesRegistradas.user',
+            'logs.user',
+            'logs.semana',
             'semanas.itens.medicamento',
             'semanas.itens.combo.itens.medicamento',
+            'semanas.atendimentos.iniciadoPor',
+            'semanas.atendimentos.finalizadoPor',
             'semanas.atendimentos.aplicacoes.item',
             'semanas.atendimentos.aplicacoes.medicamento',
             'semanas.atendimentos.aplicacoes.entradaItem',
+            'semanas.atendimentos.aplicacoes.vasilhameAberto',
+            'semanas.atendimentos.aplicacoes.user',
             'semanas.parcelas',
-            'financeiro.parcelas',
+            'financeiro.parcelas.semana',
             'financeiro.pagamentos.user',
         ]);
 
@@ -266,13 +270,33 @@ class PrescricaoController extends Controller
     }
 
     /**
-     * Prescrição detalhada em uma página, para conferência e impressão.
+     * Prescrição completa em uma página: dados, financeiro, semanas com o
+     * histórico das aplicações, anotações e o histórico (logs). As edições
+     * acontecem nos modais da própria tela.
      */
     public function imprimir(Prescricao $prescricao)
     {
         return view('prescricoes.imprimir', [
             'prescricao' => $this->carregarParaImpressao($prescricao),
+            'clinicas' => Clinica::orderBy('nome')->get(),
+            'tipos' => TipoAtendimento::cases(),
+            'formasPagamento' => FormaPagamento::opcoes(),
+            'formasComParcelas' => FormaPagamento::comParcelas(),
+            'parcelasDisponiveis' => FormaPagamento::parcelasDisponiveis(),
         ]);
+    }
+
+    /**
+     * Médicos da Feegow para o modal de edição (carregado só quando o modal
+     * abre: a página não depende da Feegow para abrir).
+     */
+    public function medicos()
+    {
+        try {
+            return response()->json(['medicos' => $this->feegow->listarMedicos()]);
+        } catch (\Throwable $e) {
+            return response()->json(['medicos' => [], 'erro' => $e->getMessage()]);
+        }
     }
 
     /**
@@ -377,9 +401,7 @@ class PrescricaoController extends Controller
             'detalhes' => ['Observação' => $dados['observacao']],
         ]);
 
-        return redirect()
-            ->route('prescricoes.show', ['prescricao' => $prescricao, 'aba' => 'observacoes'])
-            ->with('success', 'Observação registrada.');
+        return $this->voltarParaPrescricao($request, $prescricao, 'Observação registrada.', 'observacoes');
     }
 
     /**
