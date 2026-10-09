@@ -151,6 +151,93 @@ class PrescricaoController extends Controller
     }
 
     /**
+     * Formulário de edição dos dados da prescrição (cabeçalho). As semanas,
+     * os itens e o financeiro têm telas próprias.
+     */
+    public function edit(Prescricao $prescricao)
+    {
+        $prescricao->load(['paciente', 'clinica']);
+
+        // Lista de clínicas e médicos igual à do cadastro. Se a Feegow cair, o
+        // médico é editado em texto livre (não perde o que está gravado).
+        $clinicas = Clinica::orderBy('nome')->get();
+        $medicos = [];
+        $erroMedicos = null;
+
+        try {
+            $medicos = $this->feegow->listarMedicos();
+        } catch (\Throwable $e) {
+            $erroMedicos = $e->getMessage();
+        }
+
+        return view('prescricoes.edit', [
+            'prescricao' => $prescricao,
+            'clinicas' => $clinicas,
+            'medicos' => $medicos,
+            'erroMedicos' => $erroMedicos,
+            'tipos' => TipoAtendimento::cases(),
+        ]);
+    }
+
+    /**
+     * Atualiza os dados do cabeçalho da prescrição. Toda mudança fica no
+     * histórico (campo, de, para); o médico é gravado pelo id e pelo nome,
+     * porque a Feegow pode mudar/remover o profissional.
+     */
+    public function update(Request $request, Prescricao $prescricao)
+    {
+        $dados = $request->validate([
+            'medico_id' => ['nullable', 'integer'],
+            'medico_nome' => ['nullable', 'string', 'max:150'],
+            'clinica_id' => ['required', 'integer', 'exists:clinicas,id'],
+            'tipo_atendimento' => ['required', Rule::enum(TipoAtendimento::class)],
+            'agendamento' => ['nullable', 'string', 'max:100'],
+            'observacoes' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'clinica_id.required' => 'Escolha a clínica da prescrição.',
+            'tipo_atendimento.required' => 'Escolha o tipo de atendimento.',
+        ]);
+
+        $prescricao->load(['paciente', 'clinica', 'financeiro']);
+
+        DB::transaction(function () use ($prescricao, $dados) {
+            $antes = $this->resumoDaPrescricao($prescricao);
+
+            $prescricao->update([
+                'medico_id' => $dados['medico_id'] ?? null,
+                'medico_nome' => $dados['medico_nome'] ?? null,
+                'clinica_id' => $dados['clinica_id'],
+                'tipo_atendimento' => $dados['tipo_atendimento'],
+                'agendamento' => $dados['agendamento'] ?? null,
+                'observacoes' => $dados['observacoes'] ?? null,
+            ]);
+
+            // A clínica é de onde saem os medicamentos e onde o dinheiro é
+            // contabilizado: o financeiro acompanha a troca.
+            if ($prescricao->financeiro && (int) $prescricao->financeiro->clinica_id !== (int) $prescricao->clinica_id) {
+                $prescricao->financeiro->update(['clinica_id' => $prescricao->clinica_id]);
+            }
+
+            $prescricao->refresh()->load(['paciente', 'clinica']);
+
+            $alteracoes = $this->compararResumos($antes, $this->resumoDaPrescricao($prescricao));
+
+            if ($alteracoes) {
+                PrescricaoLog::registrar(
+                    $prescricao,
+                    TipoLogPrescricao::Edicao,
+                    'Dados da prescrição alterados.',
+                    ['alteracoes' => $alteracoes]
+                );
+            }
+        });
+
+        return redirect()
+            ->route('prescricoes.show', $prescricao)
+            ->with('success', 'Prescrição atualizada com sucesso.');
+    }
+
+    /**
      * Detalhes da prescrição.
      */
     public function show(Prescricao $prescricao)
@@ -461,6 +548,44 @@ class PrescricaoController extends Controller
         ];
 
         return array_filter($detalhes, fn ($valor) => filled($valor) && $valor !== '—');
+    }
+
+    /**
+     * Resumo do cabeçalho da prescrição para comparar antes/depois no histórico.
+     *
+     * @return array<string, string>
+     */
+    private function resumoDaPrescricao(Prescricao $prescricao): array
+    {
+        return [
+            'Médico' => $prescricao->medico_nome ?? '—',
+            'Clínica' => $prescricao->clinica?->nome ?? '—',
+            'Tipo de atendimento' => $prescricao->tipo_atendimento?->label() ?? '—',
+            'Agendamento' => $prescricao->agendamento ?? '—',
+            'Observações' => $prescricao->observacoes ?? '—',
+        ];
+    }
+
+    /**
+     * Compara dois resumos e devolve as mudanças no formato do histórico.
+     *
+     * @param  array<string, string>  $antes
+     * @param  array<string, string>  $depois
+     * @return array<int, array<string, string>>
+     */
+    private function compararResumos(array $antes, array $depois): array
+    {
+        $alteracoes = [];
+
+        foreach ($antes as $campo => $de) {
+            $para = $depois[$campo] ?? '—';
+
+            if ($de !== $para) {
+                $alteracoes[] = ['campo' => $campo, 'de' => $de, 'para' => $para];
+            }
+        }
+
+        return $alteracoes;
     }
 
     /**

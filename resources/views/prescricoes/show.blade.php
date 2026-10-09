@@ -16,6 +16,11 @@
           <i class="ri-arrow-left-line me-1"></i>Voltar
         </a>
 
+        {{-- Dados do cabeçalho (médico, clínica, tipo, agendamento e observações) --}}
+        <a href="{{ route('prescricoes.edit', $prescricao) }}" class="btn btn-primary">
+          <i class="ri-file-edit-line me-1"></i>Editar prescrição
+        </a>
+
         {{-- Excluir prescrição: só administradores e só enquanto nenhuma semana
              tiver aplicação de Ampola/Miligrama --}}
         @if (auth()->user()?->ehAdministrador())

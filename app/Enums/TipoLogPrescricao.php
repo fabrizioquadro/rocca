@@ -8,6 +8,7 @@ namespace App\Enums;
 enum TipoLogPrescricao: string
 {
     case Criacao = 'criacao';
+    case Edicao = 'edicao';
     case SemanaCriada = 'semana_criada';
     case SemanaEditada = 'semana_editada';
     case SemanaExcluida = 'semana_excluida';
@@ -33,6 +34,7 @@ enum TipoLogPrescricao: string
     {
         return match ($this) {
             self::Criacao => 'Prescrição criada',
+            self::Edicao => 'Prescrição editada',
             self::SemanaCriada => 'Semana criada',
             self::SemanaEditada => 'Semana editada',
             self::SemanaExcluida => 'Semana excluída',
@@ -64,7 +66,7 @@ enum TipoLogPrescricao: string
         return match ($this) {
             self::Criacao, self::SemanaCriada, self::AnexoEnviado, self::Observacao => 'bg-label-primary',
             self::Aplicacao, self::PagamentoRegistrado, self::AtendimentoFinalizado => 'bg-label-success',
-            self::SemanaEditada, self::FinanceiroAjustado, self::ItemPendente, self::Remanejamento => 'bg-label-warning',
+            self::SemanaEditada, self::FinanceiroAjustado, self::ItemPendente, self::Remanejamento, self::Edicao => 'bg-label-warning',
             self::SemanaExcluida, self::Exclusao, self::PagamentoRemovido, self::AnexoRemovido => 'bg-label-danger',
             self::EnvioFila, self::AtendimentoIniciado, self::VasilhameAberto, self::FeegowEnviado => 'bg-label-info',
             self::FeegowErro => 'bg-label-danger',
@@ -79,6 +81,7 @@ enum TipoLogPrescricao: string
     {
         return match ($this) {
             self::Criacao => 'ri-file-add-line',
+            self::Edicao => 'ri-file-edit-line',
             self::SemanaCriada => 'ri-calendar-event-line',
             self::SemanaEditada => 'ri-edit-line',
             self::SemanaExcluida, self::Exclusao => 'ri-delete-bin-7-line',

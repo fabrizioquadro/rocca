@@ -70,6 +70,11 @@
                       <a class="dropdown-item" href="{{ route('prescricoes.show', $prescricao) }}">
                         <i class="ri-arrow-right-circle-line me-2"></i>Acessar
                       </a>
+
+                      {{-- Corrige médico, clínica, tipo de atendimento, agendamento e observações --}}
+                      <a class="dropdown-item" href="{{ route('prescricoes.edit', $prescricao) }}">
+                        <i class="ri-file-edit-line me-2"></i>Editar
+                      </a>
                     </div>
                   </div>
                 </td>
