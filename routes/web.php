@@ -206,6 +206,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/prescricoes/{prescricao}/editar', [PrescricaoController::class, 'edit'])->name('prescricoes.edit');
     Route::put('/prescricoes/{prescricao}', [PrescricaoController::class, 'update'])->name('prescricoes.update');
 
+    // Prescrição detalhada em uma página (conferência, impressão e PDF)
+    Route::get('/prescricoes/{prescricao}/imprimir', [PrescricaoController::class, 'imprimir'])->name('prescricoes.imprimir');
+    Route::get('/prescricoes/{prescricao}/imprimir/pdf', [PrescricaoController::class, 'imprimirPdf'])->name('prescricoes.imprimir.pdf');
+
     Route::delete('/prescricoes/{prescricao}', [PrescricaoController::class, 'destroy'])->middleware('perfil:administrador')->name('prescricoes.destroy');
 
     // Anexos da prescrição (exames, receitas, documentos e etc.)

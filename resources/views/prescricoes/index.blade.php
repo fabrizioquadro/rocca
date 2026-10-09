@@ -75,6 +75,11 @@
                       <a class="dropdown-item" href="{{ route('prescricoes.edit', $prescricao) }}">
                         <i class="ri-file-edit-line me-2"></i>Editar
                       </a>
+
+                      {{-- Prescrição detalhada em uma página (com PDF e impressão) --}}
+                      <a class="dropdown-item" href="{{ route('prescricoes.imprimir', $prescricao) }}">
+                        <i class="ri-printer-line me-2"></i>Imprimir Cadastro
+                      </a>
                     </div>
                   </div>
                 </td>

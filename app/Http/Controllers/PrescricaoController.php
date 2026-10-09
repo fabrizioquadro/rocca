@@ -14,6 +14,7 @@ use App\Models\PrescricaoAnexo;
 use App\Models\PrescricaoLog;
 use App\Services\FeegowService;
 use App\Services\PrescricaoSemanaService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -235,6 +236,59 @@ class PrescricaoController extends Controller
         return redirect()
             ->route('prescricoes.show', $prescricao)
             ->with('success', 'Prescrição atualizada com sucesso.');
+    }
+
+    /**
+     * Carrega tudo o que o "Imprimir cadastro" mostra: semanas com itens,
+     * aplicações e atendimentos, financeiro, anotações e anexos.
+     */
+    private function carregarParaImpressao(Prescricao $prescricao): Prescricao
+    {
+        $prescricao->load([
+            'paciente',
+            'clinica',
+            'user',
+            'anexos.user',
+            'observacoesRegistradas.user',
+            'semanas.itens.medicamento',
+            'semanas.itens.combo.itens.medicamento',
+            'semanas.atendimentos.aplicacoes.item',
+            'semanas.atendimentos.aplicacoes.medicamento',
+            'semanas.atendimentos.aplicacoes.entradaItem',
+            'semanas.parcelas',
+            'financeiro.parcelas',
+            'financeiro.pagamentos.user',
+        ]);
+
+        $prescricao->semanas->each->setRelation('prescricao', $prescricao);
+
+        return $prescricao;
+    }
+
+    /**
+     * Prescrição detalhada em uma página, para conferência e impressão.
+     */
+    public function imprimir(Prescricao $prescricao)
+    {
+        return view('prescricoes.imprimir', [
+            'prescricao' => $this->carregarParaImpressao($prescricao),
+        ]);
+    }
+
+    /**
+     * A mesma página em PDF (A4 retrato), para baixar/arquivar.
+     */
+    public function imprimirPdf(Prescricao $prescricao)
+    {
+        $prescricao = $this->carregarParaImpressao($prescricao);
+
+        $pdf = Pdf::loadView('prescricoes.pdf.prescricao', ['prescricao' => $prescricao]);
+        $pdf->setPaper('a4', 'portrait');
+
+        $nome = 'prescricao-'.$prescricao->id.'-'
+            .str($prescricao->paciente?->nome ?? 'paciente')->slug().'.pdf';
+
+        return $pdf->download($nome);
     }
 
     /**

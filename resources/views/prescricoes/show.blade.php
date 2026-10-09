@@ -21,6 +21,11 @@
           <i class="ri-file-edit-line me-1"></i>Editar prescrição
         </a>
 
+        {{-- Prescrição detalhada em uma página (com PDF e impressão) --}}
+        <a href="{{ route('prescricoes.imprimir', $prescricao) }}" class="btn btn-outline-info">
+          <i class="ri-printer-line me-1"></i>Imprimir Cadastro
+        </a>
+
         {{-- Excluir prescrição: só administradores e só enquanto nenhuma semana
              tiver aplicação de Ampola/Miligrama --}}
         @if (auth()->user()?->ehAdministrador())
