@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\TipoMovimentacaoEstoque;
+use App\Support\Numero;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -39,7 +40,9 @@ class EstoqueMovimentacao extends Model
      */
     protected $casts = [
         'tipo' => TipoMovimentacaoEstoque::class,
-        'quantidade' => 'integer',
+        // Ampola aceita fração (0,5 por aplicação), então a quantidade da
+        // movimentação não pode ser inteira: o cast antigo transformava 0,5 em 0.
+        'quantidade' => 'decimal:3',
     ];
 
     /**
@@ -79,6 +82,6 @@ class EstoqueMovimentacao extends Model
      */
     public function getQuantidadeComSinalAttribute(): string
     {
-        return ($this->quantidade > 0 ? '+' : '').$this->quantidade;
+        return ($this->quantidade > 0 ? '+' : '').Numero::formatar($this->quantidade);
     }
 }

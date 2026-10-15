@@ -93,9 +93,9 @@ class EntradaItem extends Model
     /**
      * Saldo deste lote (código de barras) em uma clínica.
      */
-    public function saldoNaClinica(int $clinicaId): int
+    public function saldoNaClinica(int $clinicaId): float
     {
-        return (int) $this->movimentacoes()->where('clinica_id', $clinicaId)->sum('quantidade');
+        return (float) $this->movimentacoes()->where('clinica_id', $clinicaId)->sum('quantidade');
     }
 
     /**
@@ -119,16 +119,16 @@ class EntradaItem extends Model
     /**
      * Saldo total de um código de barras na clínica.
      */
-    public static function saldoPorCodigo(string $codigo, int $clinicaId): int
+    public static function saldoPorCodigo(string $codigo, int $clinicaId): float
     {
-        return (int) static::lotesComSaldo($codigo, $clinicaId)->sum('saldo_clinica');
+        return (float) static::lotesComSaldo($codigo, $clinicaId)->sum('saldo_clinica');
     }
 
     /**
      * Distribui a quantidade entre os lotes disponíveis do código (FIFO).
      * Retorna [entrada_item_id => quantidade].
      */
-    public static function distribuirPorCodigo(string $codigo, int $clinicaId, int $quantidade): array
+    public static function distribuirPorCodigo(string $codigo, int $clinicaId, float $quantidade): array
     {
         $restante = $quantidade;
         $distribuicao = [];

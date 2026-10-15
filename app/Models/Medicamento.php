@@ -123,9 +123,9 @@ class Medicamento extends Model
     /**
      * Saldo atual do estoque (soma das movimentações).
      */
-    public function getEstoqueAtualAttribute(): int
+    public function getEstoqueAtualAttribute(): float
     {
-        return (int) $this->movimentacoes()->sum('quantidade');
+        return (float) $this->movimentacoes()->sum('quantidade');
     }
 
     /**
@@ -133,9 +133,9 @@ class Medicamento extends Model
      * Aproveita o `saldo` carregado por withSum (evita uma consulta por
      * medicamento) e, quando ele não veio, soma as movimentações.
      */
-    public function getSaldoAtualAttribute(): int
+    public function getSaldoAtualAttribute(): float
     {
-        return (int) round((float) ($this->attributes['saldo'] ?? $this->estoque_atual));
+        return round((float) ($this->attributes['saldo'] ?? $this->estoque_atual), 3);
     }
 
     /**
@@ -162,9 +162,9 @@ class Medicamento extends Model
      * Saldo do estoque em uma clínica específica
      * (null = todas as clínicas).
      */
-    public function estoqueNaClinica(?int $clinicaId): int
+    public function estoqueNaClinica(?int $clinicaId): float
     {
-        return (int) $this->movimentacoes()
+        return (float) $this->movimentacoes()
             ->when($clinicaId, fn ($query) => $query->where('clinica_id', $clinicaId))
             ->sum('quantidade');
     }
