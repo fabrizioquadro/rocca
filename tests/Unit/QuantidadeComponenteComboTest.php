@@ -10,7 +10,8 @@ use Tests\TestCase;
 
 /**
  * Quantidade de cada medicamento do combo: quantidade prescrita do combo
- * vezes a quantidade do medicamento no combo (ampola arredonda para cima).
+ * vezes a quantidade do medicamento no combo. A composição manda no
+ * fracionamento — 0,5 de NAC por combo baixa 0,5 (não arredonda para cima).
  */
 class QuantidadeComponenteComboTest extends TestCase
 {
@@ -46,8 +47,12 @@ class QuantidadeComponenteComboTest extends TestCase
         $this->assertSame(1.0, $this->itemCombo(2)->quantidadeDoComponente($this->componente(0.5)));
     }
 
-    public function test_ampola_nao_tem_fracao(): void
+    public function test_ampola_do_combo_mantem_a_fracao_da_composicao(): void
     {
-        $this->assertSame(2.0, $this->itemCombo(3)->quantidadeDoComponente($this->componente(0.5, TipoMedicamento::Ampola)));
+        // 7 combos com 0,5 de NAC = 3,5 ampoules (era 4 pelo arredondamento)
+        $this->assertSame(3.5, $this->itemCombo(7)->quantidadeDoComponente($this->componente(0.5, TipoMedicamento::Ampola)));
+
+        // Componente inteiro na composição continua inteiro
+        $this->assertSame(2.0, $this->itemCombo(2)->quantidadeDoComponente($this->componente(1, TipoMedicamento::Ampola)));
     }
 }

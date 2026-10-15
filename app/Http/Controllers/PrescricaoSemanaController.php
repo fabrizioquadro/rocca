@@ -518,7 +518,9 @@ class PrescricaoSemanaController extends Controller
             'observacao' => ['nullable', 'string', 'max:2000'],
 
             'itens' => ['required', 'array'],
-            'itens.*.situacao' => ['nullable', Rule::in(['aplicado', 'pendente'])],
+            // A tela manda um checkbox "Pendente" por item: marcado = não
+            // aplicado (não exige código de barras); desmarcado = aplicado.
+            'itens.*.pendente' => ['nullable', 'boolean'],
             'itens.*.codigo_barras' => ['nullable', 'string', 'max:100'],
             'itens.*.codigo_barras_2' => ['nullable', 'string', 'max:100'],
             'itens.*.quantidade_1' => ['nullable'],

@@ -58,6 +58,16 @@
     .linha {
       display: flex;
       align-items: flex-start;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    /* Cada linha ocupa uma página: a impressora avança uma etiqueta por página,
+       então nenhum desalinhamento se acumula de uma linha para a outra — nem
+       depende do arredondamento de milímetros que o navegador faz. */
+    .linha:not(:last-child) {
+      break-after: page;
+      page-break-after: always;
     }
 
     .etiqueta {
@@ -306,9 +316,13 @@
 
     <div class="dicas">
       1. Na janela de impressão, escolha a impressora de etiquetas.<br />
-      2. Papel/tamanho: largura <strong>100mm</strong> e comprimento <strong>17mm</strong> (15mm da etiqueta + 2mm de espaço entre as linhas) — uma linha de etiquetas por página; cadastre como papel personalizado se o driver pedir.<br />
-      3. Margens: <strong>nenhuma</strong>. Escala: <strong>100%</strong> (não use "ajustar à página").<br />
-      4. Desmarque "cabeçalhos e rodapés" e desative o modo econômico/densidade baixa do driver.
+      2. Papel/tamanho: largura <strong>100mm</strong> e comprimento <strong>17mm</strong> (15mm da etiqueta + 2mm do vão entre as linhas) — uma linha de etiquetas por página; cadastre como papel personalizado no driver se ele pedir.<br />
+      3. <strong>Orientação: retrato</strong> (portrait). Margens: <strong>nenhuma</strong>. Escala: <strong>100%</strong> (nunca "ajustar à página").<br />
+      4. Desmarque "cabeçalhos e rodapés" e desative o modo econômico/densidade baixa do driver.<br />
+      5. <strong>No driver</strong>, o tipo de mídia deve ser <strong>etiqueta picotada com sensor de vão (gap)</strong> e o comprimento da etiqueta <strong>17mm</strong>. Se ficar em 18mm (o valor antigo) ou em "contínuo", a impressora avança mais do que a etiqueta e o erro cresce a cada linha.<br />
+      6. A orientação (retrato/paisagem) que faz a etiqueta sair certa deve ser <strong>salva como padrão no driver</strong> (Preferências de impressão), para não precisar trocá-la a cada impressão. Se o conteúdo sai girado 90°, ou o papel está cadastrado com largura e comprimento invertidos (o correto é <strong>largura 100mm × comprimento 17mm</strong>), ou a orientação do driver não bate com esse cadastro.<br />
+      7. Calibre/sensione a bobina na impressora (tecla de feed até ela achar o vão) antes do primeiro trabalho do dia.<br />
+      8. Para conferir o alinhamento, reimprima umas <strong>30 etiquetas</strong> de um mesmo item (campo "Reimprimir"): se a última continuar caindo dentro da etiqueta, o passo do driver está certo; se o desenho for escorregando para fora, o comprimento da etiqueta no driver ainda não é 17mm.
     </div>
   </div>
 

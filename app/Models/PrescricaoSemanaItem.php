@@ -81,18 +81,14 @@ class PrescricaoSemanaItem extends Model
 
     /**
      * Quantidade de um medicamento do combo: a quantidade prescrita do combo
-     * vezes a quantidade do medicamento no combo. Como no medicamento avulso,
-     * ampola não tem fração (arredonda para cima).
+     * vezes a quantidade do medicamento no combo (ex.: 7 combos com 0,5 de NAC
+     * saem como 3,5 ampoules). No combo quem manda no fracionamento é a
+     * composição cadastrada — por isso a fração é mantida, ao contrário do
+     * medicamento avulso, onde a ampola é cobrada inteira.
      */
     public function quantidadeDoComponente(ComboItem $componente): float
     {
-        $quantidade = round((float) $this->quantidade_cobranca * (float) $componente->quantidade, 3);
-
-        if ($componente->medicamento?->tipo === TipoMedicamento::Ampola) {
-            return (float) ceil($quantidade);
-        }
-
-        return $quantidade;
+        return round((float) $this->quantidade_cobranca * (float) $componente->quantidade, 3);
     }
 
     /**
