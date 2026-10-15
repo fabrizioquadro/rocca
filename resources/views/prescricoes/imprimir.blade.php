@@ -37,6 +37,10 @@
           <i class="ri-file-pdf-2-line me-1"></i>Gerar PDF
         </a>
 
+        <a href="{{ route('prescricoes.imprimir.prescricao', $prescricao) }}" class="btn btn-outline-secondary">
+          <i class="ri-file-text-line me-1"></i>Prescrição do paciente
+        </a>
+
         <button type="button" class="btn btn-outline-secondary" onclick="window.print()">
           <i class="ri-printer-line me-1"></i>Imprimir
         </button>

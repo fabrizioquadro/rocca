@@ -26,6 +26,11 @@
           <i class="ri-printer-line me-1"></i>Imprimir Cadastro
         </a>
 
+        {{-- Mesmo documento, sem os valores: é o que se envia ao paciente --}}
+        <a href="{{ route('prescricoes.imprimir.prescricao', $prescricao) }}" class="btn btn-outline-secondary">
+          <i class="ri-file-text-line me-1"></i>Imprimir Prescrição
+        </a>
+
         {{-- Excluir prescrição: só administradores e só enquanto nenhuma semana
              tiver aplicação de Ampola/Miligrama --}}
         @if (auth()->user()?->ehAdministrador())
@@ -256,7 +261,21 @@
 
           <hr class="my-4" />
 
-          <h6 class="fw-semibold mb-3">Anexos</h6>
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h6 class="fw-semibold mb-0">Anexos</h6>
+
+            @if ($prescricao->anexos->isNotEmpty())
+              <form method="POST" action="{{ route('prescricoes.anexos.feegow', $prescricao) }}">
+                @csrf
+                <button
+                  type="submit"
+                  class="btn btn-sm btn-outline-primary"
+                  title="Enviar os anexos para o prontuário do paciente na Feegow">
+                  <i class="ri-upload-cloud-2-line me-1"></i> Enviar para a Feegow
+                </button>
+              </form>
+            @endif
+          </div>
 
           <ul class="list-group">
             @forelse ($prescricao->anexos as $anexo)
@@ -270,6 +289,14 @@
                   <small class="text-body-secondary">
                     {{ $anexo->criado_em_formatado }}{{ $anexo->user ? ' · '.$anexo->user->nome : '' }}
                   </small>
+
+                  @if ($anexo->enviado_para_feegow)
+                    <span class="badge bg-label-success" title="Anexo {{ $anexo->feegow_file_id }} no prontuário do paciente">
+                      Feegow {{ $anexo->feegow_enviado_em_formatado }}
+                    </span>
+                  @elseif ($anexo->feegow_erro)
+                    <span class="badge bg-label-danger" title="{{ $anexo->feegow_erro }}">Feegow: falha no envio</span>
+                  @endif
                 </div>
 
                 <form

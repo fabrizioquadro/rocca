@@ -211,11 +211,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/prescricoes/{prescricao}/imprimir', [PrescricaoController::class, 'imprimir'])->name('prescricoes.imprimir');
     Route::get('/prescricoes/{prescricao}/imprimir/pdf', [PrescricaoController::class, 'imprimirPdf'])->name('prescricoes.imprimir.pdf');
 
+    // Prescrição do paciente: mesmo documento sem os valores (imprimir/enviar)
+    Route::get('/prescricoes/{prescricao}/prescricao', [PrescricaoController::class, 'imprimirPrescricao'])->name('prescricoes.imprimir.prescricao');
+    Route::get('/prescricoes/{prescricao}/prescricao/pdf', [PrescricaoController::class, 'imprimirPrescricaoPdf'])->name('prescricoes.imprimir.prescricao.pdf');
+
     Route::delete('/prescricoes/{prescricao}', [PrescricaoController::class, 'destroy'])->middleware('perfil:administrador')->name('prescricoes.destroy');
 
     // Anexos da prescrição (exames, receitas, documentos e etc.)
     Route::post('/prescricoes/{prescricao}/anexos', [PrescricaoController::class, 'storeAnexo'])->name('prescricoes.anexos.store');
     Route::delete('/prescricoes/{prescricao}/anexos/{anexo}', [PrescricaoController::class, 'destroyAnexo'])->name('prescricoes.anexos.destroy');
+    Route::post('/prescricoes/{prescricao}/anexos/feegow', [PrescricaoController::class, 'enviarAnexosFeegow'])->name('prescricoes.anexos.feegow');
 
     // Observações da prescrição (linha do tempo com autor e data/hora)
     Route::post('/prescricoes/{prescricao}/observacoes', [PrescricaoController::class, 'storeObservacao'])->name('prescricoes.observacoes.store');

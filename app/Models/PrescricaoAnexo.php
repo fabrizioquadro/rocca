@@ -28,6 +28,18 @@ class PrescricaoAnexo extends Model
         'mime',
         'tamanho',
         'user_id',
+        'feegow_file_id',
+        'feegow_enviado_em',
+        'feegow_erro',
+    ];
+
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'feegow_enviado_em' => 'datetime',
     ];
 
     /**
@@ -86,5 +98,21 @@ class PrescricaoAnexo extends Model
     public function getCriadoEmFormatadoAttribute(): ?string
     {
         return $this->created_at?->format('d/m/Y H:i');
+    }
+
+    /**
+     * O anexo já foi enviado para o prontuário do paciente na Feegow?
+     */
+    public function getEnviadoParaFeegowAttribute(): bool
+    {
+        return $this->feegow_enviado_em !== null;
+    }
+
+    /**
+     * Data do envio para a Feegow (d/m/Y H:i).
+     */
+    public function getFeegowEnviadoEmFormatadoAttribute(): ?string
+    {
+        return $this->feegow_enviado_em?->format('d/m/Y H:i');
     }
 }

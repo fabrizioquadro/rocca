@@ -80,6 +80,11 @@
                       <a class="dropdown-item" href="{{ route('prescricoes.imprimir', $prescricao) }}">
                         <i class="ri-printer-line me-2"></i>Imprimir Cadastro
                       </a>
+
+                      {{-- O mesmo documento sem os valores, para enviar ao paciente --}}
+                      <a class="dropdown-item" href="{{ route('prescricoes.imprimir.prescricao', $prescricao) }}">
+                        <i class="ri-file-text-line me-2"></i>Imprimir Prescrição
+                      </a>
                     </div>
                   </div>
                 </td>

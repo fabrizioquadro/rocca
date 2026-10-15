@@ -6,6 +6,15 @@
 @php
   $financeiro = $prescricao->financeiro;
   $rotulo = fn ($valor) => filled($valor) ? $valor : '—';
+
+  // A prescrição do paciente sai do mesmo documento, sem os valores
+  $comValores = $comValores ?? true;
+
+  // No histórico o valor vem embutido no texto (ex.: "1× NAC (R$ 100,00)"):
+  // na prescrição do paciente o parêntese de valor sai
+  $semValores = fn ($texto) => $comValores
+      ? $texto
+      : trim((string) preg_replace('/\s*\(R\$\s*[\d.,]+\)/u', '', (string) $texto));
 @endphp
 
 <div class="impressao">
@@ -96,10 +105,12 @@
         <table class="imp-tabela">
           <thead>
             <tr>
-              <th style="width: 46%;">Item</th>
+              <th style="width: {{ $comValores ? 46 : 74 }}%;">Item</th>
               <th style="width: 14%;" class="imp-centro">Quantidade</th>
-              <th style="width: 14%;" class="imp-direita">Valor unitário</th>
-              <th style="width: 14%;" class="imp-direita">Valor total</th>
+              @if ($comValores)
+                <th style="width: 14%;" class="imp-direita">Valor unitário</th>
+                <th style="width: 14%;" class="imp-direita">Valor total</th>
+              @endif
               <th style="width: 12%;" class="imp-centro">Situação</th>
             </tr>
           </thead>
@@ -113,8 +124,10 @@
                   @endif
                 </td>
                 <td class="imp-centro">{{ $item->quantidade_formatada }}</td>
-                <td class="imp-direita">{{ $item->valor_formatado }}</td>
-                <td class="imp-direita">{{ $item->valor_total_formatado }}</td>
+                @if ($comValores)
+                  <td class="imp-direita">{{ $item->valor_formatado }}</td>
+                  <td class="imp-direita">{{ $item->valor_total_formatado }}</td>
+                @endif
                 <td class="imp-centro">
                   {{ $item->gera_aplicacao ? $item->status->label() : 'Não se aplica' }}
                 </td>
@@ -123,20 +136,22 @@
               {{-- Componentes do combo --}}
               @if ($item->tipo === 'combo' && $item->combo)
                 <tr>
-                  <td colspan="5" class="imp-obs">
+                  <td colspan="{{ $comValores ? 5 : 3 }}" class="imp-obs">
                     Composição: {{ $item->combo->itens->map(fn ($componente) => $componente->medicamento?->nome)->filter()->implode(' · ') ?: '—' }}
                   </td>
                 </tr>
               @endif
             @endforeach
           </tbody>
-          <tfoot>
-            <tr>
-              <th colspan="3" class="imp-direita">Total da semana</th>
-              <th class="imp-direita">{{ $semana->valor_total_formatado }}</th>
-              <th></th>
-            </tr>
-          </tfoot>
+          @if ($comValores)
+            <tfoot>
+              <tr>
+                <th colspan="3" class="imp-direita">Total da semana</th>
+                <th class="imp-direita">{{ $semana->valor_total_formatado }}</th>
+                <th></th>
+              </tr>
+            </tfoot>
+          @endif
         </table>
       @endif
 
@@ -228,8 +243,8 @@
     </div>
   @endforeach
 
-  {{-- Financeiro --}}
-  @if ($financeiro)
+  {{-- Financeiro: só no documento completo (a prescrição do paciente sai sem) --}}
+  @if ($comValores && $financeiro)
     <div class="imp-bloco">
       <table class="imp-tabela imp-titulo-bloco">
         <tr>
@@ -389,13 +404,25 @@
     </div>
   @endif
 
-  {{-- Histórico: tudo o que aconteceu na prescrição --}}
-  @if ($prescricao->logs->isNotEmpty())
+  {{-- Histórico: tudo o que aconteceu na prescrição. Na prescrição do paciente
+       os eventos financeiros ficam de fora porque carregam valores. --}}
+  @php
+    $logsVisiveis = $comValores
+        ? $prescricao->logs
+        : $prescricao->logs->reject(fn ($log) => in_array($log->acao, [
+            \App\Enums\TipoLogPrescricao::PagamentoRegistrado,
+            \App\Enums\TipoLogPrescricao::PagamentoEditado,
+            \App\Enums\TipoLogPrescricao::PagamentoRemovido,
+            \App\Enums\TipoLogPrescricao::FinanceiroAjustado,
+        ], true));
+  @endphp
+
+  @if ($logsVisiveis->isNotEmpty())
     <div class="imp-bloco">
       <table class="imp-tabela imp-titulo-bloco">
         <tr>
           <td><strong>Histórico</strong></td>
-          <td class="imp-situacao">{{ $prescricao->logs->count() }} registro(s)</td>
+          <td class="imp-situacao">{{ $logsVisiveis->count() }} registro(s)</td>
         </tr>
       </table>
 
@@ -409,7 +436,7 @@
           </tr>
         </thead>
         <tbody>
-          @foreach ($prescricao->logs->sortByDesc('created_at') as $log)
+          @foreach ($logsVisiveis->sortByDesc('created_at') as $log)
             <tr>
               <td>{{ $rotulo($log->created_at?->format('d/m/Y H:i')) }}</td>
               <td>{{ $rotulo($log->user?->nome) }}</td>
@@ -424,7 +451,7 @@
 
                 @foreach ($log->alteracoes as $alteracao)
                   <div class="imp-obs">
-                    {{ $alteracao['campo'] }}: {{ $alteracao['de'] }} → {{ $alteracao['para'] }}
+                    {{ $alteracao['campo'] }}: {{ $semValores($alteracao['de']) }} → {{ $semValores($alteracao['para']) }}
                   </div>
                 @endforeach
               </td>

@@ -59,22 +59,24 @@ class FeegowService
      *
      * A API dos agendamentos recebe os parâmetros na query string (e aceita
      * também no corpo): mandamos nos dois para não depender da versão da API.
+     * Cargas grandes (arquivo em base64) vão só no corpo.
      *
      * @throws RuntimeException
      */
-    public function post(string $endpoint, array $parametros = []): array
+    public function post(string $endpoint, array $parametros = [], bool $naQueryString = true, ?int $timeout = null): array
     {
         if (! $this->configurado()) {
             throw new RuntimeException('Integração com a Feegow não está configurada (FEEGOW_BASE_URL / FEEGOW_TOKEN).');
         }
 
-        $url = $this->baseUrl.'/'.ltrim($endpoint, '/').'?'.http_build_query($parametros);
+        $url = $this->baseUrl.'/'.ltrim($endpoint, '/')
+            .($naQueryString && $parametros !== [] ? '?'.http_build_query($parametros) : '');
 
         $resposta = Http::withHeaders([
             'X-Access-Token' => $this->token,
             'Content-Type' => 'application/json',
         ])
-            ->timeout((int) config('services.feegow.timeout', 30))
+            ->timeout($timeout ?? (int) config('services.feegow.timeout', 30))
             ->connectTimeout(15)
             ->post($url, $parametros);
 
@@ -105,6 +107,35 @@ class FeegowService
         $conteudo = $retorno['content'] ?? [];
 
         return is_array($conteudo) ? $conteudo : [];
+    }
+
+    /**
+     * Envia um arquivo para o prontuário do paciente na Feegow.
+     *
+     * A Feegow recebe o conteúdo em base64 (prefixo "data:<mime>;base64,") e
+     * devolve o fileId do arquivo criado (vem fora do "content").
+     *
+     * @throws RuntimeException
+     */
+    public function enviarArquivoPaciente(int $pacienteId, string $caminhoArquivo, ?string $descricao = null): array
+    {
+        if (! is_file($caminhoArquivo)) {
+            throw new RuntimeException('Arquivo não encontrado no servidor.');
+        }
+
+        $conteudo = (string) file_get_contents($caminhoArquivo);
+
+        if ($conteudo === '') {
+            throw new RuntimeException('Arquivo vazio ou ilegível.');
+        }
+
+        $mime = mime_content_type($caminhoArquivo) ?: 'application/octet-stream';
+
+        return $this->post('patient/upload-base64', [
+            'paciente_id' => $pacienteId,
+            'base64_file' => 'data:'.$mime.';base64,'.base64_encode($conteudo),
+            'arquivo_descricao' => mb_substr((string) ($descricao ?? basename($caminhoArquivo)), 0, 250),
+        ], false, 300);
     }
 
     /**

@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class PrescricaoController extends Controller
 {
@@ -316,6 +317,37 @@ class PrescricaoController extends Controller
     }
 
     /**
+     * Prescrição do paciente: o mesmo documento do "Imprimir cadastro", sem os
+     * valores (colunas de valor, total da semana, bloco financeiro e os eventos
+     * financeiros do histórico), pronto para imprimir ou enviar.
+     */
+    public function imprimirPrescricao(Prescricao $prescricao)
+    {
+        return view('prescricoes.imprimir-prescricao', [
+            'prescricao' => $this->carregarParaImpressao($prescricao),
+        ]);
+    }
+
+    /**
+     * A prescrição do paciente em PDF (A4 retrato), para enviar/arquivar.
+     */
+    public function imprimirPrescricaoPdf(Prescricao $prescricao)
+    {
+        $prescricao = $this->carregarParaImpressao($prescricao);
+
+        $pdf = Pdf::loadView('prescricoes.pdf.prescricao', [
+            'prescricao' => $prescricao,
+            'comValores' => false,
+        ]);
+        $pdf->setPaper('a4', 'portrait');
+
+        $nome = 'prescricao-paciente-'.$prescricao->id.'-'
+            .str($prescricao->paciente?->nome ?? 'paciente')->slug().'.pdf';
+
+        return $pdf->download($nome);
+    }
+
+    /**
      * Detalhes da prescrição.
      */
     public function show(Prescricao $prescricao)
@@ -424,6 +456,81 @@ class PrescricaoController extends Controller
         return redirect()
             ->route('prescricoes.show', $prescricao)
             ->with('success', 'Anexo removido.');
+    }
+
+    /**
+     * Envia os anexos da prescrição para o prontuário do paciente na Feegow.
+     *
+     * Cada arquivo é enviado uma única vez: o fileId devolvido pela Feegow fica
+     * gravado no anexo e as próximas execuções pulam o que já foi enviado
+     * (os que falharam podem ser reenviados).
+     */
+    public function enviarAnexosFeegow(Prescricao $prescricao)
+    {
+        $prescricao->load(['paciente', 'anexos']);
+
+        $pacienteFeegow = (int) ($prescricao->paciente->paciente_id ?? 0);
+
+        if (! $this->feegow->configurado() || $pacienteFeegow <= 0) {
+            return redirect()
+                ->route('prescricoes.show', $prescricao)
+                ->with('error', 'Não foi possível enviar: integração com a Feegow não configurada ou paciente sem cadastro na Feegow.');
+        }
+
+        $pendentes = $prescricao->anexos->whereNull('feegow_enviado_em');
+
+        if ($pendentes->isEmpty()) {
+            return redirect()
+                ->route('prescricoes.show', $prescricao)
+                ->with('info', 'Todos os anexos desta prescrição já foram enviados para a Feegow.');
+        }
+
+        $enviados = 0;
+        $falhas = [];
+
+        foreach ($pendentes as $anexo) {
+            try {
+                $retorno = $this->feegow->enviarArquivoPaciente(
+                    $pacienteFeegow,
+                    public_path($anexo->arquivo),
+                    $anexo->nome,
+                );
+
+                $anexo->update([
+                    'feegow_file_id' => $retorno['fileId'] ?? null,
+                    'feegow_enviado_em' => now(),
+                    'feegow_erro' => null,
+                ]);
+
+                $enviados++;
+            } catch (Throwable $e) {
+                $anexo->update(['feegow_erro' => mb_substr($e->getMessage(), 0, 500)]);
+
+                $falhas[] = $anexo->nome.': '.mb_substr($e->getMessage(), 0, 120);
+            }
+        }
+
+        if ($enviados > 0) {
+            PrescricaoLog::registrar($prescricao, TipoLogPrescricao::FeegowEnviado, $enviados.' anexo(s) enviado(s) para a Feegow.', [
+                'detalhes' => ['Anexos' => $enviados.' de '.$pendentes->count()],
+            ]);
+        }
+
+        if ($falhas !== []) {
+            PrescricaoLog::registrar($prescricao, TipoLogPrescricao::FeegowErro, 'Falha ao enviar anexo(s) para a Feegow.', [
+                'detalhes' => ['Erros' => implode(' | ', array_slice($falhas, 0, 5))],
+            ]);
+        }
+
+        if ($falhas === []) {
+            return redirect()
+                ->route('prescricoes.show', $prescricao)
+                ->with('success', $enviados.' anexo(s) enviado(s) para a Feegow.');
+        }
+
+        return redirect()
+            ->route('prescricoes.show', $prescricao)
+            ->with('error', $enviados.' anexo(s) enviado(s) para a Feegow; falha em: '.implode(' | ', array_slice($falhas, 0, 3)));
     }
 
     /**
