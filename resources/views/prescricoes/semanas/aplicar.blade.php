@@ -199,9 +199,10 @@
                     </small>
                   </td>
 
-                  {{-- Quantidade não é editável: é a quantidade prescrita/cobrada.
+                  {{-- Quantidade não é editável: é a quantidade prescrita, que é o
+                       que sai do estoque (ampola aceita fração: 0,5 baixa 0,5).
                        Medicamento por mg mostra a dose em mg. --}}
-                  <td>{{ $item->eh_miligrama ? $item->quantidade_formatada.' mg' : (int) $item->quantidade_cobranca }}</td>
+                  <td>{{ $item->eh_miligrama ? $item->quantidade_formatada.' mg' : $item->quantidade_formatada }}</td>
 
                   <td>
                     @if ($item->eh_procedimento)
@@ -869,7 +870,7 @@
             linha,
             `<span class="badge bg-label-success">Lote ${dados.lote ?? '—'}</span>`
               + `<span class="d-block small text-body-secondary mt-1">venc. ${dados.vencimento ?? '—'}`
-              + ` · saldo na clínica: <strong>${dados.saldo}</strong></span>`
+              + ` · saldo na clínica: <strong>${Number(dados.saldo).toLocaleString('pt-BR')}</strong></span>`
           );
         } catch (erro) {
           mostrarInfo(linha, '<span class="small text-danger">Não foi possível consultar o código de barras.</span>');
@@ -1202,7 +1203,7 @@
 
             if (dados.estado === 'fechado') {
               infoVasilhame.innerHTML = '<div class="alert alert-success mb-0 py-2">Vasilhame fechado ('
-                + `${dados.saldo_fechado} unidade(s) em estoque) — pode abrir.</div>`;
+                + `${Number(dados.saldo_fechado).toLocaleString('pt-BR')} unidade(s) em estoque) — pode abrir.</div>`;
 
               return;
             }

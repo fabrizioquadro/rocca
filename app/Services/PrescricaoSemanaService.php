@@ -506,23 +506,24 @@ class PrescricaoSemanaService
 
         $lote = $this->resolverLote($item, $linha['codigo_barras'] ?? null, $clinicaId);
 
-        // A quantidade não é editável na tela: é a quantidade prescrita
-        // (para ampola, já arredondada para cima em quantidade_cobranca).
-        $quantidade = (int) $this->normalizarNumero($linha['quantidade'] ?? $item->quantidade_cobranca);
+        // A quantidade não é editável na tela: é a quantidade prescrita, com a
+        // fração (0,5 ampola baixa 0,5 no estoque). O arredondamento para cima
+        // fica só na cobrança (quantidade_cobranca), que é outra coisa.
+        $quantidade = round($this->normalizarNumero($linha['quantidade'] ?? $item->quantidade), 3);
 
         // A data/hora da aplicação é sempre a da execução (hora de salvar).
         $aplicadoEm = $this->dataHora($linha['aplicado_em'] ?? null);
 
-        if ($quantidade < 1) {
+        if ($quantidade <= 0) {
             throw ValidationException::withMessages([
                 'itens' => 'Informe a quantidade aplicada de '.$item->nome.'.',
             ]);
         }
 
-        if ($quantidade > (int) $lote->saldo_clinica) {
+        if ($quantidade > (float) $lote->saldo_clinica + 0.001) {
             throw ValidationException::withMessages([
-                'itens' => 'O lote '.$lote->lote.' tem apenas '.(int) $lote->saldo_clinica
-                    .' unidade(s) — não dá para aplicar '.$quantidade.' de '.$item->nome.'.',
+                'itens' => 'O lote '.$lote->lote.' tem apenas '.Numero::formatar($lote->saldo_clinica)
+                    .' unidade(s) — não dá para aplicar '.Numero::formatar($quantidade).' de '.$item->nome.'.',
             ]);
         }
 
@@ -648,7 +649,7 @@ class PrescricaoSemanaService
 
             if ($quantidade > (float) $lote->saldo_clinica + 0.001) {
                 throw ValidationException::withMessages([
-                    'itens' => 'O lote '.$lote->lote.' tem apenas '.(int) $lote->saldo_clinica
+                    'itens' => 'O lote '.$lote->lote.' tem apenas '.Numero::formatar($lote->saldo_clinica)
                         .' unidade(s) — não dá para aplicar '.Numero::formatar($quantidade).' de '.$nome.'.',
                 ]);
             }
