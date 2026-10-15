@@ -157,6 +157,43 @@ class FiltrosRecebimentosTest extends TestCase
         $pagina->assertSee('option value="'.$a->paciente_id.'" selected', false);
     }
 
+    public function test_mostra_cpf_e_procedimento_do_paciente(): void
+    {
+        [$usuario, $a] = $this->cenario();
+
+        $pagina = $this->actingAs($usuario)
+            ->get(route('relatorios.recebimentos', ['paciente_id' => $a->paciente_id]));
+
+        $pagina->assertOk()
+            ->assertSee('CPF')
+            ->assertSee('Procedimento');
+
+        // O CPF do paciente da linha aparece na coluna nova
+        if ($a->paciente?->cpf_formatado) {
+            $pagina->assertSee($a->paciente->cpf_formatado);
+        }
+    }
+
+    public function test_exportacao_leva_as_colunas_novas(): void
+    {
+        [$usuario] = $this->cenario();
+
+        // A exportação (PDF e planilha) lê a tabela da página: as colunas novas
+        // precisam chegar lá
+        $html = $this->actingAs($usuario)->get(route('relatorios.recebimentos'))->getContent();
+        $dados = app(\App\Services\RelatorioExportacaoService::class)->extrair($html);
+
+        // As colunas vêm como linhas de células (cabeçalho da tabela)
+        $colunas = collect($dados['colunas'])->flatten()->all();
+
+        $this->assertContains('CPF', $colunas);
+        $this->assertContains('Procedimento', $colunas);
+
+        // Cada linha do relatório tem a mesma quantidade de células do cabeçalho
+        $this->assertNotEmpty($dados['linhas']);
+        $this->assertCount(count($colunas), $dados['linhas'][0]);
+    }
+
     public function test_filtros_combinados(): void
     {
         [$usuario, $a] = $this->cenario();

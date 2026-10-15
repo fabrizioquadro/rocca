@@ -47,9 +47,11 @@
             <tr>
               <th style="width: 115px;">Data</th>
               <th style="min-width: 180px;">Paciente</th>
+              <th style="width: 140px;">CPF</th>
               <th style="width: 90px;">Prescrição</th>
               <th style="min-width: 170px;">Médico</th>
               <th style="width: 150px;">Atendimento</th>
+              <th style="width: 150px;">Procedimento</th>
               <th style="width: 150px;">Clínica</th>
               <th style="width: 150px;">Forma de pagamento</th>
               <th style="width: 140px;">ID</th>
@@ -65,6 +67,7 @@
               <tr>
                 <td class="fw-semibold">{{ $pagamento->data_formatada ?? '—' }}</td>
                 <td>{{ $prescricao?->paciente?->nome ?? '—' }}</td>
+                <td>{{ $prescricao?->paciente?->cpf_formatado ?? '—' }}</td>
                 <td>
                   @if ($prescricao)
                     <a href="{{ route('prescricoes.show', ['prescricao' => $prescricao, 'aba' => 'financeiro']) }}">
@@ -75,6 +78,8 @@
                   @endif
                 </td>
                 <td>{{ $prescricao?->medico_nome ?? '—' }}</td>
+                <td>{{ $prescricao?->tipo_atendimento?->label() ?? '—' }}</td>
+                {{-- Mesmo tipo do Atendimento: é o que define a nota (tratamento x consulta) --}}
                 <td>{{ $prescricao?->tipo_atendimento?->label() ?? '—' }}</td>
                 <td>{{ $pagamento->financeiro?->clinica?->nome ?? '—' }}</td>
                 <td>{{ $pagamento->forma_descricao }}</td>
@@ -87,7 +92,7 @@
           </tbody>
           <tfoot>
             <tr>
-              <th colspan="8" class="text-end">Total recebido</th>
+              <th colspan="10" class="text-end">Total recebido</th>
               <th class="text-end">R$ {{ number_format($totalRecebido, 2, ',', '.') }}</th>
               <th colspan="2"></th>
             </tr>
