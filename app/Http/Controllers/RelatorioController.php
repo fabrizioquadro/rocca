@@ -282,8 +282,8 @@ class RelatorioController extends Controller
             ->orderBy('created_at')
             ->get();
 
-        $entradas = (int) $movimentacoes->where('quantidade', '>', 0)->sum('quantidade');
-        $saidas = abs((int) $movimentacoes->where('quantidade', '<', 0)->sum('quantidade'));
+        $entradas = round((float) $movimentacoes->where('quantidade', '>', 0)->sum('quantidade'), 3);
+        $saidas = abs(round((float) $movimentacoes->where('quantidade', '<', 0)->sum('quantidade'), 3));
 
         return view('relatorios.movimentacoes', array_merge(
             $this->dadosComuns($request),
@@ -335,7 +335,7 @@ class RelatorioController extends Controller
             ->sortBy([['medicamento', 'asc'], ['clinica', 'asc'], ['vencimento', 'asc']])
             ->values();
 
-        $unidades = (int) $linhas->sum('quantidade');
+        $unidades = round((float) $linhas->sum('quantidade'), 3);
         $valorTotal = round((float) $linhas->sum('valor_total'), 2);
 
         return view('relatorios.posicao-estoque', array_merge(

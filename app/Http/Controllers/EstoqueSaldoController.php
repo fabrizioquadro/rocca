@@ -36,7 +36,7 @@ class EstoqueSaldoController extends Controller
     {
         $linhas = $this->saldosPorLote($medicamento);
 
-        $total = (int) $linhas->sum('quantidade');
+        $total = round((float) $linhas->sum('quantidade'), 3);
 
         $vasilhames = VasilhameAberto::with(['entradaItem', 'clinica', 'abertoPor'])
             ->where('medicamento_id', $medicamento->id)
@@ -79,7 +79,7 @@ class EstoqueSaldoController extends Controller
             ->orderBy('id')
             ->get();
 
-        $saldo = (int) $movimentacoes->sum('quantidade');
+        $saldo = round((float) $movimentacoes->sum('quantidade'), 3);
 
         // Medicamento por mg: os vasilhames abertos e o que saiu de cada um
         $vasilhames = $entradaItem->medicamento?->eh_miligrama
@@ -146,7 +146,7 @@ class EstoqueSaldoController extends Controller
                     'lote' => $item?->lote ?? '—',
                     'vencimento' => $item?->vencimento,
                     'vencimento_formatado' => $item?->vencimento_formatado ?? '—',
-                    'quantidade' => (int) $saldo->saldo,
+                    'quantidade' => (float) $saldo->saldo,
                 ];
             })
             ->sortBy(fn (array $linha) => [

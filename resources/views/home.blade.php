@@ -365,7 +365,7 @@
                     <tr>
                       <td>{{ $linha['medicamento'] }}</td>
                       <td class="text-center fw-semibold">{{ $linha['aplicacoes'] }}</td>
-                      <td class="text-center">{{ $linha['unidades'] > 0 ? $linha['unidades'] : '—' }}</td>
+                      <td class="text-center">{{ $linha['unidades'] > 0 ? \App\Support\Numero::formatar($linha['unidades']) : '—' }}</td>
                       <td class="text-center">
                         {{ $linha['mg'] > 0 ? \App\Support\Numero::formatar($linha['mg']) : '—' }}
                       </td>
@@ -376,7 +376,7 @@
                   <tr>
                     <th class="text-end">Total</th>
                     <th class="text-center">{{ $aplicacoesPorMedicamento->sum('aplicacoes') }}</th>
-                    <th class="text-center">{{ $aplicacoesPorMedicamento->sum('unidades') }}</th>
+                    <th class="text-center">{{ \App\Support\Numero::formatar($aplicacoesPorMedicamento->sum('unidades')) }}</th>
                     <th class="text-center">
                       {{ \App\Support\Numero::formatar($aplicacoesPorMedicamento->sum('mg')) }}
                     </th>
@@ -553,7 +553,7 @@
                 const linha = linhas[opcoes.dataPointIndex];
                 const partes = [valor + ' aplicação(ões)'];
 
-                if (linha.unidades > 0) partes.push(linha.unidades + ' unidade(s)');
+                if (linha.unidades > 0) partes.push(linha.unidades.toLocaleString('pt-BR') + ' unidade(s)');
                 if (linha.mg > 0) partes.push(linha.mg.toLocaleString('pt-BR') + ' mg');
 
                 return partes.join(' · ');

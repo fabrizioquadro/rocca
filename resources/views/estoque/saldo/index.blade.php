@@ -31,7 +31,7 @@
           <tbody>
             @foreach ($medicamentos as $medicamento)
               @php
-                $saldo = (int) $medicamento->saldo;
+                $saldo = round((float) $medicamento->saldo, 3);
                 $mgAbertos = (float) ($medicamento->mg_abertos ?? 0);
                 $temEstoque = $saldo > 0 || $mgAbertos > 0;
                 $abaixoDoMinimo = $medicamento->estoque_minimo !== null && $saldo < (int) $medicamento->estoque_minimo;
@@ -49,7 +49,7 @@
                 <td>{{ $medicamento->grupo?->nome ?? '—' }}</td>
                 <td>{{ $medicamento->fabricante ?? '—' }}</td>
                 <td class="text-end fw-semibold {{ $temEstoque ? '' : 'text-danger' }}">
-                  {{ $saldo }}
+                  {{ \App\Support\Numero::formatar($saldo) }}
 
                   @if ($medicamento->eh_miligrama)
                     <small class="d-block fw-normal text-body-secondary">fechado(s)</small>

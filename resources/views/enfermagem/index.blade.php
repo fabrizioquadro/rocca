@@ -346,7 +346,7 @@
               <tr>
                 <td>{{ $linha['usuario'] }}</td>
                 <td class="text-center fw-semibold">{{ $linha['aplicacoes'] }}</td>
-                <td class="text-center">{{ $linha['unidades'] > 0 ? $linha['unidades'] : '—' }}</td>
+                <td class="text-center">{{ $linha['unidades'] > 0 ? \App\Support\Numero::formatar($linha['unidades']) : '—' }}</td>
                 <td class="text-center">
                   {{ $linha['mg'] > 0 ? \App\Support\Numero::formatar($linha['mg']) : '—' }}
                 </td>
@@ -357,7 +357,7 @@
             <tr>
               <th class="text-end">Total</th>
               <th class="text-center">{{ $aplicacoesPorUsuario->sum('aplicacoes') }}</th>
-              <th class="text-center">{{ $aplicacoesPorUsuario->sum('unidades') }}</th>
+              <th class="text-center">{{ \App\Support\Numero::formatar($aplicacoesPorUsuario->sum('unidades')) }}</th>
               <th class="text-center">
                 {{ \App\Support\Numero::formatar($aplicacoesPorUsuario->sum('mg')) }}
               </th>

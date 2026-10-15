@@ -62,7 +62,7 @@ class EnfermagemController extends Controller
             ->map(fn ($aplicacoes) => [
                 'usuario' => $aplicacoes->first()->user?->nome ?? 'Usuário removido',
                 'aplicacoes' => $aplicacoes->count(),
-                'unidades' => (int) round((float) $aplicacoes->whereNull('vasilhame_aberto_id')->sum('quantidade')),
+                'unidades' => round((float) $aplicacoes->whereNull('vasilhame_aberto_id')->sum('quantidade'), 3),
                 'mg' => round((float) $aplicacoes->whereNotNull('vasilhame_aberto_id')->sum('quantidade'), 2),
             ])
             ->sortByDesc('aplicacoes')

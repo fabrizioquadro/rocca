@@ -124,7 +124,7 @@
                   <td class="text-end fw-semibold {{ $movimentacao->quantidade < 0 ? 'text-danger' : 'text-success' }}">
                     {{ $movimentacao->quantidade_com_sinal }}
                   </td>
-                  <td class="text-end">{{ $saldoCorrente }}</td>
+                  <td class="text-end">{{ \App\Support\Numero::formatar($saldoCorrente) }}</td>
                   <td>{{ $movimentacao->user?->nome ?? '—' }}</td>
                   <td class="small text-body-secondary">{{ $movimentacao->observacao ?? '—' }}</td>
                 </tr>

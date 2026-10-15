@@ -298,7 +298,7 @@ class DashboardController extends Controller
                 'medicamento' => $medicamento,
                 'aplicacoes' => $grupo->count(),
                 // mg (vasilhame aberto) e unidades (ampola/combo) são grandezas diferentes
-                'unidades' => (int) round((float) $grupo->whereNull('vasilhame_aberto_id')->sum('quantidade')),
+                'unidades' => round((float) $grupo->whereNull('vasilhame_aberto_id')->sum('quantidade'), 3),
                 'mg' => round((float) $grupo->whereNotNull('vasilhame_aberto_id')->sum('quantidade'), 2),
             ])
             ->sortByDesc('aplicacoes')

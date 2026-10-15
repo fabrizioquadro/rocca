@@ -59,7 +59,7 @@ class EstoqueBuscaController extends Controller
             'medicamento' => $primeiro->medicamento?->nome,
             'lote' => $primeiro->lote,
             'vencimento' => $primeiro->vencimento_formatado,
-            'saldo' => (int) $itens->sum('saldo_clinica'),
+            'saldo' => (float) $itens->sum('saldo_clinica'),
         ]);
     }
 

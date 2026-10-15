@@ -22,7 +22,7 @@
                 @if ($medicamento->fabricante)
                   · {{ $medicamento->fabricante }}
                 @endif
-                · {{ $total }} unidade(s) em estoque
+                · {{ \App\Support\Numero::formatar($total) }} unidade(s) em estoque
                 @if ($medicamento->eh_miligrama)
                   · {{ \App\Support\Numero::formatar($mgAbertos) }} mg em vasilhames abertos
                 @endif
@@ -68,7 +68,7 @@
 
             <div class="col-md-6">
               <div class="form-floating form-floating-outline">
-                <input type="text" class="form-control" id="total" value="{{ $total }}" readonly />
+                <input type="text" class="form-control" id="total" value="{{ \App\Support\Numero::formatar($total) }}" readonly />
                 <label for="total">Total em estoque</label>
               </div>
             </div>
@@ -100,7 +100,7 @@
                     <td class="font-monospace">{{ $linha['codigo_barras'] }}</td>
                     <td>{{ $linha['lote'] }}</td>
                     <td>{{ $linha['vencimento_formatado'] }}</td>
-                    <td class="text-end fw-semibold">{{ $linha['quantidade'] }}</td>
+                    <td class="text-end fw-semibold">{{ \App\Support\Numero::formatar($linha['quantidade']) }}</td>
                     <td class="text-center">
                       {{-- Histórico do código: entradas, saídas, transferências e aplicações --}}
                       <a
@@ -120,7 +120,7 @@
               <tfoot>
                 <tr>
                   <th colspan="4" class="text-end">Total</th>
-                  <th class="text-end">{{ $total }}</th>
+                  <th class="text-end">{{ \App\Support\Numero::formatar($total) }}</th>
                   <th></th>
                 </tr>
               </tfoot>

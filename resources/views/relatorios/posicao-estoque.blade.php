@@ -23,7 +23,7 @@
         </div>
         <div class="col-md-3">
           <small class="text-muted d-block">Unidades em estoque</small>
-          <span class="fw-semibold">{{ $unidades }}</span>
+          <span class="fw-semibold">{{ \App\Support\Numero::formatar($unidades) }}</span>
         </div>
         <div class="col-md-3">
           <small class="text-muted d-block">Valor em estoque</small>
@@ -66,7 +66,7 @@
                     <span class="badge bg-label-danger ms-1">vencido</span>
                   @endif
                 </td>
-                <td class="text-end fw-semibold">{{ $linha['quantidade'] }}</td>
+                <td class="text-end fw-semibold">{{ \App\Support\Numero::formatar($linha['quantidade']) }}</td>
                 <td class="text-end">R$ {{ number_format($linha['valor_unitario'], 2, ',', '.') }}</td>
                 <td class="text-end fw-semibold">R$ {{ number_format($linha['valor_total'], 2, ',', '.') }}</td>
               </tr>
@@ -75,7 +75,7 @@
           <tfoot>
             <tr>
               <th colspan="5" class="text-end">Total</th>
-              <th class="text-end">{{ $unidades }}</th>
+              <th class="text-end">{{ \App\Support\Numero::formatar($unidades) }}</th>
               <th></th>
               <th class="text-end">R$ {{ number_format($valorTotal, 2, ',', '.') }}</th>
             </tr>

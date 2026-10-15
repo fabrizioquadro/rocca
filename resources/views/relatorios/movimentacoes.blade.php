@@ -24,15 +24,15 @@
         </div>
         <div class="col-md-3">
           <small class="text-muted d-block">Entradas (unidades)</small>
-          <span class="fw-semibold text-success">+{{ $entradas }}</span>
+          <span class="fw-semibold text-success">+{{ \App\Support\Numero::formatar($entradas) }}</span>
         </div>
         <div class="col-md-3">
           <small class="text-muted d-block">Saídas (unidades)</small>
-          <span class="fw-semibold text-danger">-{{ $saidas }}</span>
+          <span class="fw-semibold text-danger">-{{ \App\Support\Numero::formatar($saidas) }}</span>
         </div>
         <div class="col-md-3">
           <small class="text-muted d-block">Saldo do período</small>
-          <span class="fw-semibold">{{ $entradas - $saidas }}</span>
+          <span class="fw-semibold">{{ \App\Support\Numero::formatar($entradas - $saidas) }}</span>
         </div>
       </div>
     </x-slot:resumo>
