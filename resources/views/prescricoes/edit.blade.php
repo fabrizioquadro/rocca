@@ -31,7 +31,7 @@
         continuam com as telas próprias — esta edição não mexe neles.
       </p>
 
-      <form method="POST" action="{{ route('prescricoes.update', $prescricao) }}">
+      <form method="POST" action="{{ route('prescricoes.update', $prescricao) }}" enctype="multipart/form-data">
         @csrf
         @method('PUT')
 
@@ -137,6 +137,12 @@
               rows="2"
               class="form-control">{{ old('observacoes', $prescricao->observacoes) }}</textarea>
           </div>
+
+          <div class="col-12">
+            <hr class="my-2" />
+
+            @include('prescricoes._campo-anexos')
+          </div>
         </div>
 
         <div class="d-flex gap-2 mt-4">
@@ -171,4 +177,6 @@
       medicoSelect.addEventListener('change', atualizarMedicoNome);
     });
   </script>
+
+  @include('prescricoes._campo-anexos-script')
 @endpush

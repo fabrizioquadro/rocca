@@ -142,30 +142,7 @@
 
         <hr class="my-4" />
 
-        <div class="mb-3">
-          <label class="form-label" for="anexos">
-            Anexos (exames, receitas, documentos e etc.)
-            <span class="text-danger d-none" data-anexo-obrigatorio>obrigatório</span>
-          </label>
-          <input
-            type="file"
-            id="anexos"
-            name="anexos[]"
-            class="form-control @error('anexos') is-invalid @enderror @error('anexos.*') is-invalid @enderror"
-            multiple
-            accept=".pdf,.jpg,.jpeg,.png,.webp,.xml,.csv" />
-          <small class="text-muted">PDF, imagem, XML ou CSV — máx. 10MB por arquivo</small>
-          <div class="text-danger small d-none" data-aviso-anexo>
-            Esta prescrição tem medicamento do tipo <strong>ampola</strong> ou <strong>miligrama</strong>
-            com aplicação, então o anexo da prescrição médica é obrigatório.
-          </div>
-          @error('anexos')
-            <div class="invalid-feedback">{{ $message }}</div>
-          @enderror
-          @error('anexos.*')
-            <div class="invalid-feedback">{{ $message }}</div>
-          @enderror
-        </div>
+        @include('prescricoes._campo-anexos', ['avisoObrigatorio' => true])
 
         <hr class="my-4" />
 
@@ -624,4 +601,5 @@
 
   @include('partials.crud-scripts')
   @include('prescricoes._form-script')
+  @include('prescricoes._campo-anexos-script')
 @endpush

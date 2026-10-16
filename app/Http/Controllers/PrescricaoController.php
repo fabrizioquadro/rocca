@@ -158,7 +158,7 @@ class PrescricaoController extends Controller
      */
     public function edit(Prescricao $prescricao)
     {
-        $prescricao->load(['paciente', 'clinica']);
+        $prescricao->load(['paciente', 'clinica', 'anexos']);
 
         // Lista de clínicas e médicos igual à do cadastro. Se a Feegow cair, o
         // médico é editado em texto livre (não perde o que está gravado).
@@ -195,14 +195,21 @@ class PrescricaoController extends Controller
             'tipo_atendimento' => ['required', Rule::enum(TipoAtendimento::class)],
             'agendamento' => ['nullable', 'string', 'max:100'],
             'observacoes' => ['nullable', 'string', 'max:2000'],
+            // Anexos novos: podem vir de vários campos ("Adicionar mais arquivos")
+            'anexos' => ['nullable', 'array'],
+            'anexos.*' => ['file', 'mimes:pdf,jpg,jpeg,png,webp,xml,csv', 'max:10240'],
         ], [
             'clinica_id.required' => 'Escolha a clínica da prescrição.',
             'tipo_atendimento.required' => 'Escolha o tipo de atendimento.',
+            'anexos.*.mimes' => 'Formato não permitido (use PDF, imagem, XML ou CSV).',
+            'anexos.*.max' => 'Cada arquivo deve ter no máximo 10MB.',
         ]);
 
         $prescricao->load(['paciente', 'clinica', 'financeiro']);
 
-        DB::transaction(function () use ($prescricao, $dados) {
+        $anexosSalvos = 0;
+
+        DB::transaction(function () use ($prescricao, $dados, $request, &$anexosSalvos) {
             $antes = $this->resumoDaPrescricao($prescricao);
 
             $prescricao->update([
@@ -232,9 +239,17 @@ class PrescricaoController extends Controller
                     ['alteracoes' => $alteracoes]
                 );
             }
+
+            // Anexos novos entram depois da comparação: eles têm o registro
+            // próprio no histórico (Anexo enviado), um por arquivo
+            $anexosSalvos = $this->salvarAnexosComLog($prescricao, $request->file('anexos', []));
         });
 
-        return $this->voltarParaPrescricao($request, $prescricao, 'Prescrição atualizada com sucesso.');
+        $mensagem = $anexosSalvos > 0
+            ? 'Prescrição atualizada e '.$anexosSalvos.' anexo(s) enviado(s).'
+            : 'Prescrição atualizada com sucesso.';
+
+        return $this->voltarParaPrescricao($request, $prescricao, $mensagem);
     }
 
     /**
@@ -396,15 +411,7 @@ class PrescricaoController extends Controller
             ]
         );
 
-        foreach ($this->salvarAnexos($prescricao, $request->file('anexos', [])) as $anexo) {
-            PrescricaoLog::registrar($prescricao, TipoLogPrescricao::AnexoEnviado, 'Anexo enviado: '.$anexo->nome.'.', [
-                'detalhes' => [
-                    'Arquivo' => $anexo->nome,
-                    'Tamanho' => $anexo->tamanho_formatado,
-                    'Tipo' => $anexo->mime,
-                ],
-            ]);
-        }
+        $this->salvarAnexosComLog($prescricao, $request->file('anexos', []));
 
         return redirect()
             ->route('prescricoes.show', $prescricao)
@@ -769,6 +776,29 @@ class PrescricaoController extends Controller
         }
 
         return $alteracoes;
+    }
+
+    /**
+     * Salva os anexos e registra cada um no histórico.
+     *
+     * @param  array<int, \Illuminate\Http\UploadedFile>  $arquivos
+     * @return int  Quantidade de anexos gravados
+     */
+    private function salvarAnexosComLog(Prescricao $prescricao, array $arquivos): int
+    {
+        $criados = $this->salvarAnexos($prescricao, $arquivos);
+
+        foreach ($criados as $anexo) {
+            PrescricaoLog::registrar($prescricao, TipoLogPrescricao::AnexoEnviado, 'Anexo enviado: '.$anexo->nome.'.', [
+                'detalhes' => [
+                    'Arquivo' => $anexo->nome,
+                    'Tamanho' => $anexo->tamanho_formatado,
+                    'Tipo' => $anexo->mime,
+                ],
+            ]);
+        }
+
+        return count($criados);
     }
 
     /**

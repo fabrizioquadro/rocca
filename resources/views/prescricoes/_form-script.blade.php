@@ -1159,14 +1159,18 @@
       formularioPrescricao.addEventListener('submit', (event) => {
         if (!precisaAnexo()) return;
 
-        const campoAnexos = document.getElementById('anexos');
-        const temArquivo = campoAnexos && campoAnexos.files && campoAnexos.files.length > 0;
+        // Os anexos podem estar em vários campos ("Adicionar mais arquivos")
+        const camposAnexos = Array.from(document.querySelectorAll('[data-anexo-campo]'));
+        const comArquivo = (campo) => !!(campo.files && campo.files.length);
+        const temArquivo = camposAnexos.some(comArquivo);
 
         if (!temArquivo) {
           event.preventDefault();
           alert('Anexe a prescrição médica: há medicamento do tipo ampola ou miligrama com aplicação.');
 
-          if (campoAnexos) campoAnexos.focus();
+          const vazio = camposAnexos.find((campo) => !comArquivo(campo));
+
+          if (vazio) vazio.focus();
         }
       });
 
