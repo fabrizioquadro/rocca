@@ -13,9 +13,11 @@ use App\Models\Prescricao;
 use App\Models\PrescricaoAnexo;
 use App\Models\PrescricaoLog;
 use App\Services\FeegowService;
+use App\Services\PrescricaoEdicaoService;
 use App\Services\PrescricaoSemanaService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Validation\Rule;
@@ -24,9 +26,25 @@ use Throwable;
 
 class PrescricaoController extends Controller
 {
+    /**
+     * Onde fica guardado o formulário já conferido, esperando a autorização.
+     */
+    private const SESSAO_EDICAO = 'prescricao_edicao';
+
+    /**
+     * Validade da conferência (minutos).
+     */
+    private const VALIDADE_EDICAO = 30;
+
+    /**
+     * Erro ao carregar os médicos da Feegow (mostrado na tela).
+     */
+    private ?string $erroMedicos = null;
+
     public function __construct(
         private FeegowService $feegow,
         private PrescricaoSemanaService $semanas,
+        private PrescricaoEdicaoService $edicao,
     ) {
     }
 
@@ -153,92 +171,117 @@ class PrescricaoController extends Controller
     }
 
     /**
-     * Formulário de edição dos dados da prescrição (cabeçalho). As semanas,
-     * os itens e o financeiro têm telas próprias.
+     * Formulário de edição da prescrição: cabeçalho, anexos, medicamentos e
+     * semanas. Ao conferir, o resumo aparece no fim desta mesma página e nada é
+     * gravado antes da autorização.
      */
     public function edit(Prescricao $prescricao)
     {
         $prescricao->load(['paciente', 'clinica', 'anexos']);
 
-        // Lista de clínicas e médicos igual à do cadastro. Se a Feegow cair, o
-        // médico é editado em texto livre (não perde o que está gravado).
-        $clinicas = Clinica::orderBy('nome')->get();
-        $medicos = [];
-        $erroMedicos = null;
-
-        try {
-            $medicos = $this->feegow->listarMedicos();
-        } catch (\Throwable $e) {
-            $erroMedicos = $e->getMessage();
-        }
-
-        return view('prescricoes.edit', [
+        return view('prescricoes.edit', array_merge([
             'prescricao' => $prescricao,
-            'clinicas' => $clinicas,
-            'medicos' => $medicos,
-            'erroMedicos' => $erroMedicos,
+            'clinicas' => Clinica::orderBy('nome')->get(),
+            'medicos' => $this->medicosDaFeegow(),
+            'erroMedicos' => $this->erroMedicos,
             'tipos' => TipoAtendimento::cases(),
-        ]);
+        ], $this->dadosDasSemanas($prescricao)));
     }
 
     /**
-     * Atualiza os dados do cabeçalho da prescrição. Toda mudança fica no
-     * histórico (campo, de, para); o médico é gravado pelo id e pelo nome,
-     * porque a Feegow pode mudar/remover o profissional.
+     * Médicos da Feegow para o select da tela (a lista é pequena: vem inteira).
+     * Se a Feegow cair, o médico continua sendo editado em texto livre.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function medicosDaFeegow(): array
+    {
+        try {
+            return $this->feegow->listarMedicos();
+        } catch (\Throwable $e) {
+            $this->erroMedicos = $e->getMessage();
+
+            return [];
+        }
+    }
+
+    /**
+     * Dados que a tela de edição precisa para montar as semanas, os
+     * medicamentos/combos disponíveis e o retrato atual do financeiro.
+     *
+     * @return array<string, mixed>
+     */
+    private function dadosDasSemanas(Prescricao $prescricao, ?array $semanasDoFormulario = null): array
+    {
+        $prescricao->loadMissing([
+            'semanas.itens.medicamento',
+            'semanas.itens.combo',
+            'semanas.parcelas',
+        ]);
+
+        $estado = $prescricao->semanas->mapWithKeys(fn ($semana) => [
+            $semana->id => [
+                'numero' => (int) $semana->numero,
+                'status_label' => $semana->status->label(),
+                'status_cor' => $semana->status->corBadge(),
+                'bloqueada' => ! $semana->pode_ser_alterada,
+                'motivo' => $semana->motivo_bloqueio,
+                'pode_excluir' => $semana->pode_ser_excluida,
+                'motivo_exclusao' => $semana->motivo_bloqueio_exclusao,
+                'valor_total' => $semana->valor_total,
+            ],
+        ])->all();
+
+        $semanas = $prescricao->semanas
+            ->map(fn ($semana) => [
+                'id' => $semana->id,
+                'data_prevista' => $semana->data_prevista?->format('Y-m-d'),
+                'sem_aplicacao' => (bool) $semana->sem_aplicacao,
+                'observacao' => $semana->observacao,
+                'itens' => $semana->itens
+                    ->map(fn ($item) => [
+                        'tipo' => $item->tipo,
+                        'medicamento_id' => $item->medicamento_id,
+                        'combo_id' => $item->combo_id,
+                        'quantidade' => (float) $item->quantidade,
+                        'valor' => (float) $item->valor,
+                    ])
+                    ->all(),
+            ])
+            ->all();
+
+        return [
+            'semanas' => $semanasDoFormulario ?? old('semanas', $semanas),
+            'estado' => $estado,
+            'medicamentos' => Medicamento::orderBy('nome')->get(),
+            'combos' => Combo::with('itens.medicamento')->orderBy('nome')->get(),
+            'financeiro' => $this->edicao->resumoFinanceiro($prescricao),
+            'resumoAlteracoes' => null,
+        ];
+    }
+
+    /**
+     * Atualiza a prescrição. Quando o formulário manda as semanas (tela de
+     * edição), nada é gravado: o resumo aparece no fim da mesma página e a
+     * gravação acontece no "Autorizar e aplicar" (aplicarEdicao).
+     *
+     * Sem as semanas (modal "Editar dados da prescrição" na tela da prescrição)
+     * o comportamento continua o de antes: grava o cabeçalho e volta.
      */
     public function update(Request $request, Prescricao $prescricao)
     {
-        $dados = $request->validate([
-            'medico_id' => ['nullable', 'integer'],
-            'medico_nome' => ['nullable', 'string', 'max:150'],
-            'clinica_id' => ['required', 'integer', 'exists:clinicas,id'],
-            'tipo_atendimento' => ['required', Rule::enum(TipoAtendimento::class)],
-            'agendamento' => ['nullable', 'string', 'max:100'],
-            'observacoes' => ['nullable', 'string', 'max:2000'],
-            // Anexos novos: podem vir de vários campos ("Adicionar mais arquivos")
-            'anexos' => ['nullable', 'array'],
-            'anexos.*' => ['file', 'mimes:pdf,jpg,jpeg,png,webp,xml,csv', 'max:10240'],
-        ], [
-            'clinica_id.required' => 'Escolha a clínica da prescrição.',
-            'tipo_atendimento.required' => 'Escolha o tipo de atendimento.',
-            'anexos.*.mimes' => 'Formato não permitido (use PDF, imagem, XML ou CSV).',
-            'anexos.*.max' => 'Cada arquivo deve ter no máximo 10MB.',
-        ]);
+        $dados = $request->validate($this->regrasDoCabecalho(), $this->mensagensDoCabecalho());
+
+        if ($request->has('semanas')) {
+            return $this->conferirEdicao($request, $prescricao, $dados);
+        }
 
         $prescricao->load(['paciente', 'clinica', 'financeiro']);
 
         $anexosSalvos = 0;
 
         DB::transaction(function () use ($prescricao, $dados, $request, &$anexosSalvos) {
-            $antes = $this->resumoDaPrescricao($prescricao);
-
-            $prescricao->update([
-                'medico_id' => $dados['medico_id'] ?? null,
-                'medico_nome' => $dados['medico_nome'] ?? null,
-                'clinica_id' => $dados['clinica_id'],
-                'tipo_atendimento' => $dados['tipo_atendimento'],
-                'agendamento' => $dados['agendamento'] ?? null,
-                'observacoes' => $dados['observacoes'] ?? null,
-            ]);
-
-            // A clínica é de onde saem os medicamentos e onde o dinheiro é
-            // contabilizado: o financeiro acompanha a troca.
-            if ($prescricao->financeiro && (int) $prescricao->financeiro->clinica_id !== (int) $prescricao->clinica_id) {
-                $prescricao->financeiro->update(['clinica_id' => $prescricao->clinica_id]);
-            }
-
-            $prescricao->refresh()->load(['paciente', 'clinica']);
-
-            $alteracoes = $this->compararResumos($antes, $this->resumoDaPrescricao($prescricao));
-
-            if ($alteracoes) {
-                PrescricaoLog::registrar(
-                    $prescricao,
-                    TipoLogPrescricao::Edicao,
-                    'Dados da prescrição alterados.',
-                    ['alteracoes' => $alteracoes]
-                );
-            }
+            $this->aplicarCabecalho($prescricao, $dados);
 
             // Anexos novos entram depois da comparação: eles têm o registro
             // próprio no histórico (Anexo enviado), um por arquivo
@@ -250,6 +293,220 @@ class PrescricaoController extends Controller
             : 'Prescrição atualizada com sucesso.';
 
         return $this->voltarParaPrescricao($request, $prescricao, $mensagem);
+    }
+
+    /**
+     * Grava a prescrição inteira depois da autorização: cabeçalho (com o
+     * histórico das mudanças) e as semanas/itens conferidos no resumo.
+     */
+    public function aplicarEdicao(Request $request, Prescricao $prescricao)
+    {
+        $guardado = $request->session()->get(self::SESSAO_EDICAO.'.'.$prescricao->id);
+
+        $proprio = $guardado && ($guardado['user_id'] ?? null) === auth()->id();
+        $atual = $guardado && ($guardado['em'] ?? 0) >= now()->subMinutes(self::VALIDADE_EDICAO)->timestamp;
+
+        if (! $proprio || ! $atual) {
+            return redirect()
+                ->route('prescricoes.edit', $prescricao)
+                ->with('error', $guardado
+                    ? 'A conferência desta alteração expirou. Confira as alterações de novo.'
+                    : 'Confira as alterações antes de aplicar.');
+        }
+
+        $problemas = [];
+        $resumo = null;
+
+        DB::transaction(function () use ($prescricao, $guardado, &$problemas, &$resumo) {
+            $resultado = $this->edicao->montarPlano($prescricao, $guardado['semanas']);
+
+            if ($resultado['problemas'] !== []) {
+                $problemas = $resultado['problemas'];
+
+                return;
+            }
+
+            $prescricao->load(['paciente', 'clinica', 'financeiro']);
+
+            $this->aplicarCabecalho($prescricao, $guardado['cabecalho']);
+            $this->edicao->aplicarPlano($prescricao, $resultado['plano']);
+
+            $resumo = $resultado['resumo'];
+
+            PrescricaoLog::registrar(
+                $prescricao,
+                TipoLogPrescricao::Edicao,
+                'Medicamentos e semanas alterados (edição da prescrição).',
+                ['detalhes' => [
+                    'Semanas criadas' => (string) $resumo['criadas'],
+                    'Semanas alteradas' => (string) $resumo['alteradas'],
+                    'Semanas excluídas' => (string) $resumo['excluidas'],
+                    'Semanas mantidas' => (string) $resumo['mantidas'],
+                ]]
+            );
+        });
+
+        if ($problemas !== []) {
+            return redirect()
+                ->route('prescricoes.edit', $prescricao)
+                ->with('error', 'Não foi possível aplicar: '.implode(' ', $problemas));
+        }
+
+        $request->session()->forget(self::SESSAO_EDICAO.'.'.$prescricao->id);
+
+        return redirect()
+            ->route('prescricoes.show', $prescricao)
+            ->with('success', 'Prescrição atualizada: '.$resumo['criadas'].' semana(s) criada(s), '
+                .$resumo['alteradas'].' alterada(s) e '.$resumo['excluidas'].' excluída(s).');
+    }
+
+    /**
+     * Monta o plano das semanas e devolve a própria tela de edição com o resumo
+     * do que vai mudar (nada gravado).
+     *
+     * @param  array<string, mixed>  $dados
+     */
+    private function conferirEdicao(Request $request, Prescricao $prescricao, array $dados)
+    {
+        $resultado = $this->edicao->montarPlano($prescricao, $dados['semanas'] ?? []);
+
+        if ($resultado['problemas'] !== []) {
+            return back()
+                ->withInput()
+                ->withErrors(['semanas' => $resultado['problemas']]);
+        }
+
+        $cabecalho = Arr::only($dados, [
+            'medico_id', 'medico_nome', 'clinica_id', 'tipo_atendimento', 'agendamento', 'observacoes',
+        ]);
+
+        // Anexos são arquivos: não dá para segurar para depois, então entram
+        // agora (com o registro no histórico) e o resumo avisa
+        $anexosSalvos = $this->salvarAnexosComLog($prescricao, $request->file('anexos', []));
+
+        $request->session()->put(self::SESSAO_EDICAO.'.'.$prescricao->id, [
+            'cabecalho' => $cabecalho,
+            'semanas' => $resultado['plano'] === [] ? [] : ($dados['semanas'] ?? []),
+            'user_id' => auth()->id(),
+            'em' => now()->timestamp,
+        ]);
+
+        $prescricao->load(['paciente', 'clinica', 'anexos']);
+
+        return view('prescricoes.edit', array_merge([
+            'prescricao' => $prescricao,
+            'clinicas' => Clinica::orderBy('nome')->get(),
+            'medicos' => $this->medicosDaFeegow(),
+            'erroMedicos' => $this->erroMedicos,
+            'tipos' => TipoAtendimento::cases(),
+        ], $this->dadosDasSemanas($prescricao, $dados['semanas'] ?? []), [
+            'resumoAlteracoes' => [
+                'plano' => $resultado['plano'],
+                'resumo' => $resultado['resumo'],
+                'avisos' => array_merge($resultado['avisos'], $anexosSalvos > 0
+                    ? [$anexosSalvos.' anexo(s) foram gravados agora: anexos entram direto, sem esperar a autorização.']
+                    : []),
+                'financeiro' => $this->edicao->projetarFinanceiro($prescricao, $resultado['plano']),
+            ],
+        ]));
+    }
+
+    /**
+     * Aplica o cabeçalho e registra as alterações no histórico (campo, de,
+     * para). O médico é gravado pelo id e pelo nome, porque a Feegow pode
+     * mudar/remover o profissional.
+     *
+     * @param  array<string, mixed>  $dados
+     * @return array<int, array<string, string>>
+     */
+    private function aplicarCabecalho(Prescricao $prescricao, array $dados): array
+    {
+        $antes = $this->resumoDaPrescricao($prescricao);
+
+        $prescricao->update([
+            'medico_id' => $dados['medico_id'] ?? null,
+            'medico_nome' => $dados['medico_nome'] ?? null,
+            'clinica_id' => $dados['clinica_id'],
+            'tipo_atendimento' => $dados['tipo_atendimento'],
+            'agendamento' => $dados['agendamento'] ?? null,
+            'observacoes' => $dados['observacoes'] ?? null,
+        ]);
+
+        // A clínica é de onde saem os medicamentos e onde o dinheiro é
+        // contabilizado: o financeiro acompanha a troca.
+        if ($prescricao->financeiro && (int) $prescricao->financeiro->clinica_id !== (int) $prescricao->clinica_id) {
+            $prescricao->financeiro->update(['clinica_id' => $prescricao->clinica_id]);
+        }
+
+        $prescricao->refresh()->load(['paciente', 'clinica']);
+
+        $alteracoes = $this->compararResumos($antes, $this->resumoDaPrescricao($prescricao));
+
+        if ($alteracoes) {
+            PrescricaoLog::registrar(
+                $prescricao,
+                TipoLogPrescricao::Edicao,
+                'Dados da prescrição alterados.',
+                ['alteracoes' => $alteracoes]
+            );
+        }
+
+        return $alteracoes;
+    }
+
+    /**
+     * Regras do cabeçalho (médico, clínica, tipo, agendamento, observações) e
+     * dos anexos.
+     *
+     * @return array<string, mixed>
+     */
+    private function regrasDoCabecalho(): array
+    {
+        return [
+            'medico_id' => ['nullable', 'integer'],
+            'medico_nome' => ['nullable', 'string', 'max:150'],
+            'clinica_id' => ['required', 'integer', 'exists:clinicas,id'],
+            'tipo_atendimento' => ['required', Rule::enum(TipoAtendimento::class)],
+            'agendamento' => ['nullable', 'string', 'max:100'],
+            'observacoes' => ['nullable', 'string', 'max:2000'],
+            // Anexos novos: podem vir de vários campos ("Adicionar mais arquivos")
+            'anexos' => ['nullable', 'array'],
+            'anexos.*' => ['file', 'mimes:pdf,jpg,jpeg,png,webp,xml,csv', 'max:10240'],
+
+            // Semanas da tela de edição (as chaves vêm do formulário)
+            'semanas' => ['nullable', 'array'],
+            'semanas.*.id' => ['nullable', 'integer'],
+            'semanas.*.excluir' => ['nullable', 'boolean'],
+            'semanas.*.data_prevista' => ['nullable', 'date'],
+            'semanas.*.sem_aplicacao' => ['nullable', 'boolean'],
+            'semanas.*.observacao' => ['nullable', 'string', 'max:255'],
+            'semanas.*.itens' => ['nullable', 'array'],
+            'semanas.*.itens.*.tipo' => ['nullable', Rule::in(['medicamento', 'combo'])],
+            'semanas.*.itens.*.medicamento_id' => ['nullable', 'integer', 'exists:medicamentos,id'],
+            'semanas.*.itens.*.combo_id' => ['nullable', 'integer', 'exists:combos,id'],
+            'semanas.*.itens.*.quantidade' => ['nullable'],
+            'semanas.*.itens.*.valor' => ['nullable'],
+        ];
+    }
+
+    /**
+     * Mensagens dos erros do formulário.
+     *
+     * @return array<string, string>
+     */
+    private function mensagensDoCabecalho(): array
+    {
+        return [
+            'clinica_id.required' => 'Escolha a clínica da prescrição.',
+            'tipo_atendimento.required' => 'Escolha o tipo de atendimento.',
+            'anexos.*.mimes' => 'Formato não permitido (use PDF, imagem, XML ou CSV).',
+            'anexos.*.max' => 'Cada arquivo deve ter no máximo 10MB.',
+            'semanas.*.data_prevista.date' => 'Uma das datas informadas não é válida.',
+            'semanas.*.observacao.max' => 'A observação da semana deve ter no máximo 255 caracteres.',
+            'semanas.*.itens.*.tipo.in' => 'O tipo do item deve ser medicamento ou combo.',
+            'semanas.*.itens.*.medicamento_id.exists' => 'Um dos medicamentos informados não existe mais no cadastro.',
+            'semanas.*.itens.*.combo_id.exists' => 'Um dos combos informados não existe mais no cadastro.',
+        ];
     }
 
     /**

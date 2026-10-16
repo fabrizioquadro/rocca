@@ -19,16 +19,21 @@
     <div class="card-body">
       @if ($errors->any())
         <div class="alert alert-danger" role="alert">
-          <strong>Corrija os erros abaixo:</strong><br />
-          @foreach ($errors->all() as $error)
-            {{ $error }}<br />
-          @endforeach
+          <strong>Não foi possível continuar:</strong>
+          <ul class="mb-0 mt-2">
+            @foreach ($errors->all() as $error)
+              <li>{{ $error }}</li>
+            @endforeach
+          </ul>
         </div>
       @endif
 
       <p class="text-muted small">
-        Aqui você corrige os dados do cabeçalho da prescrição. As semanas, os medicamentos e o financeiro
-        continuam com as telas próprias — esta edição não mexe neles.
+        Nesta tela você corrige o cabeçalho, os anexos, os medicamentos e as semanas da prescrição.
+        Ao conferir, aparece no fim da página o resumo do que vai mudar — inclusive o efeito no
+        financeiro — e nada é gravado antes de você autorizar.
+        As semanas que já têm aplicação registrada ficam travadas (cadeado): elas são o histórico do
+        que foi aplicado e não podem mudar. O financeiro tem a aba própria na tela da prescrição.
       </p>
 
       <form method="POST" action="{{ route('prescricoes.update', $prescricao) }}" enctype="multipart/form-data">
@@ -145,9 +150,35 @@
           </div>
         </div>
 
-        <div class="d-flex gap-2 mt-4">
+        <hr class="my-4" />
+
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+          <h6 class="fw-semibold mb-0">Medicamentos e semanas</h6>
+
+          <button type="button" id="adicionar-semana" class="btn btn-sm btn-outline-primary">
+            <i class="ri-add-line me-1"></i>Adicionar semana
+          </button>
+        </div>
+
+        <div id="semanas"></div>
+
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+          <small class="text-muted">
+            Valor atual da prescrição: <strong>{{ $prescricao->valor_total_formatado }}</strong>
+            @if ($financeiro['existe'])
+              · financeiro: <strong>{{ number_format($financeiro['total'], 2, ',', '.') }}</strong>
+              @if ($financeiro['recebido'] > 0)
+                (já recebido {{ number_format($financeiro['recebido'], 2, ',', '.') }})
+              @endif
+            @endif
+          </small>
+
+          <div class="fw-semibold">Total das semanas (novo): <span id="total-geral">R$ 0,00</span></div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-4">
           <button type="submit" class="btn btn-primary">
-            <i class="ri-save-3-line me-1"></i>Salvar alterações
+            <i class="ri-file-list-3-line me-1"></i>Conferir alterações
           </button>
           <a href="{{ route('prescricoes.show', $prescricao) }}" class="btn btn-outline-secondary">
             Cancelar
@@ -156,10 +187,51 @@
       </form>
     </div>
   </div>
+
+  {{-- O resumo do que vai mudar aparece no fim da própria tela, depois de conferir --}}
+  @if (! empty($resumoAlteracoes))
+    @include('prescricoes.medicamentos._resumo', [
+      'plano' => $resumoAlteracoes['plano'],
+      'resumo' => $resumoAlteracoes['resumo'],
+      'avisos' => $resumoAlteracoes['avisos'],
+      'financeiro' => $resumoAlteracoes['financeiro'],
+    ])
+  @endif
+
+  {{-- Modelo de semana (clonado pelo JS para cada semana, incluindo as novas) --}}
+  <template id="modelo-semana">
+    @include('prescricoes.medicamentos._modelo-semana')
+  </template>
+
+  {{-- Modelo de item, usado dentro de qualquer semana --}}
+  <template id="modelo-item">
+    @include('prescricoes.medicamentos._modelo-item', ['medicamentos' => $medicamentos, 'combos' => $combos])
+  </template>
 @endsection
 
+@push('styles')
+  <link rel="stylesheet" href="{{ asset('template/assets/vendor/libs/select2/select2.css') }}" />
+
+  <style>
+    /* Semana marcada como "sem aplicação" fica com tonalidade escura */
+    [data-semana].semana-sem-aplicacao {
+      background-color: rgba(0, 0, 0, .18) !important;
+      border-color: rgba(0, 0, 0, .35) !important;
+    }
+
+    /* Semana com aplicação registrada: travada, só para leitura */
+    [data-semana][data-bloqueada="1"] {
+      background-color: rgba(0, 0, 0, .04);
+    }
+  </style>
+@endpush
+
 @push('scripts')
+  <script src="{{ asset('template/assets/vendor/libs/select2/select2.js') }}"></script>
   <script>
+    window.prescricaoSemanas = @json(array_values($semanas));
+    window.prescricaoEstado = @json($estado);
+
     // O nome do médico é gravado junto com o id (a Feegow pode mudar/remover o profissional)
     document.addEventListener('DOMContentLoaded', function () {
       const medicoSelect = document.getElementById('medico_id');
@@ -179,4 +251,5 @@
   </script>
 
   @include('prescricoes._campo-anexos-script')
+  @include('prescricoes.medicamentos._script')
 @endpush

@@ -203,9 +203,11 @@ Route::middleware('auth')->group(function () {
     Route::post('/prescricoes', [PrescricaoController::class, 'store'])->name('prescricoes.store');
     Route::get('/prescricoes/{prescricao}', [PrescricaoController::class, 'show'])->name('prescricoes.show');
 
-    // Dados do cabeçalho (médico, clínica, tipo de atendimento, agendamento e observações)
+    // Dados do cabeçalho, anexos, medicamentos e semanas (tudo numa tela só:
+    // o resumo das alterações aparece no fim da própria página)
     Route::get('/prescricoes/{prescricao}/editar', [PrescricaoController::class, 'edit'])->name('prescricoes.edit');
     Route::put('/prescricoes/{prescricao}', [PrescricaoController::class, 'update'])->name('prescricoes.update');
+    Route::post('/prescricoes/{prescricao}/editar/aplicar', [PrescricaoController::class, 'aplicarEdicao'])->name('prescricoes.editar.aplicar');
 
     // Prescrição detalhada em uma página (conferência, impressão e PDF)
     Route::get('/prescricoes/{prescricao}/imprimir', [PrescricaoController::class, 'imprimir'])->name('prescricoes.imprimir');

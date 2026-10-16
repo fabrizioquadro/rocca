@@ -16,7 +16,7 @@
           <i class="ri-arrow-left-line me-1"></i>Voltar
         </a>
 
-        {{-- Dados do cabeçalho (médico, clínica, tipo, agendamento e observações) --}}
+        {{-- Dados do cabeçalho, anexos, medicamentos e semanas --}}
         <a href="{{ route('prescricoes.edit', $prescricao) }}" class="btn btn-primary">
           <i class="ri-file-edit-line me-1"></i>Editar prescrição
         </a>
