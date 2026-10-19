@@ -148,10 +148,6 @@
                 </td>
                 <td>
                   <span class="badge {{ $semana->status->corBadge() }}">{{ $semana->status->label() }}</span>
-
-                  @if ($semana->status === \App\Enums\StatusSemana::AplicacaoParcial)
-                    <div class="text-body-secondary small">voltou para aplicar o restante</div>
-                  @endif
                 </td>
                 <td>{{ $semana->prescricao->clinica?->nome ?? '—' }}</td>
                 <td class="text-wrap">

@@ -20,8 +20,10 @@ class EnfermagemController extends Controller
      */
     public function index()
     {
-        // Fila de trabalho: o paciente chegou e o atendimento ainda não começou
-        // (inclui a volta do paciente depois de uma aplicação parcial)
+        // Fila de trabalho: o paciente CHEGOU e o atendimento ainda não começou.
+        // Só "Fila de Aplicação" entra aqui: a semana com aplicação parcial é o
+        // paciente que foi atendido e voltou para casa — ela só reaparece na
+        // fila quando voltar e for enviada de novo ("paciente retornou").
         $fila = PrescricaoSemana::with([
             'prescricao.paciente',
             'prescricao.clinica',
@@ -29,7 +31,7 @@ class EnfermagemController extends Controller
             'itens.medicamento',
             'itens.combo',
         ])
-            ->whereIn('status', [StatusSemana::FilaAplicacao, StatusSemana::AplicacaoParcial])
+            ->where('status', StatusSemana::FilaAplicacao)
             ->whereDoesntHave('atendimentos', fn ($query) => $query->whereNull('finalizado_em'))
             ->orderByRaw('chegada_em IS NULL')
             ->orderBy('chegada_em')
