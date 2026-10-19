@@ -1337,13 +1337,17 @@ class PrescricaoSemanaService
 
     /**
      * Valor final do financeiro: bruto - desconto + adicional.
-     * Valida o desconto (percentual acima de 100, desconto maior que o bruto
-     * ou total zerado/negativo).
+     *
+     * O desconto é do cliente e PODE zerar o total (cortesia de 100%, que é
+     * aprovada pela clínica): o que passa do valor das semanas é simplesmente
+     * ignorado, então o total nunca fica negativo. Continuam recusados apenas o
+     * desconto/adicional negativo (erro de digitação) e a porcentagem acima de
+     * 100%.
      */
     public function valorFinal(Financeiro $financeiro): float
     {
         $bruto = (float) $financeiro->valor_bruto;
-        $desconto = (float) $financeiro->desconto_valor;
+        $desconto = (float) $financeiro->valor_desconto;
         $adicional = (float) $financeiro->adicional_valor;
 
         if ($bruto <= 0) {
@@ -1356,28 +1360,16 @@ class PrescricaoSemanaService
             ]);
         }
 
-        if ($financeiro->desconto_eh_porcentagem && $desconto > 100) {
+        if ($financeiro->desconto_eh_porcentagem && (float) $financeiro->desconto_valor > 100) {
             throw ValidationException::withMessages([
                 'desconto_valor' => 'O desconto em porcentagem não pode passar de 100%.',
             ]);
         }
 
-        if ($financeiro->valor_desconto > $bruto) {
-            throw ValidationException::withMessages([
-                'desconto_valor' => 'O desconto aplicado no cadastro ('.$financeiro->valor_desconto_formatado.') ficaria maior que o valor das semanas ('
-                    .$financeiro->valor_bruto_formatado.'). O desconto não pode ser alterado depois do cadastro.',
-            ]);
-        }
+        // O desconto vale o que tem para descontar: daqui para baixo o total é 0
+        $desconto = min($desconto, $bruto);
 
-        $total = round($bruto - $financeiro->valor_desconto + $adicional, 2);
-
-        if ($total <= 0) {
-            throw ValidationException::withMessages([
-                'desconto_valor' => 'O desconto informado deixa o valor total zerado. Revise o desconto ou informe um adicional.',
-            ]);
-        }
-
-        return $total;
+        return round(max($bruto - $desconto + $adicional, 0), 2);
     }
 
     /**
