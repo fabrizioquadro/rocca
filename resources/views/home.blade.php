@@ -123,7 +123,7 @@
       :valor="$dinheiro($vencido)"
       icone="ri-alarm-warning-line"
       cor="danger"
-      detalhe="parcelas vencidas de todos os períodos" />
+      detalhe="aplicadas e ainda não pagas" />
   </div>
 
   <div class="row g-4 mb-4">

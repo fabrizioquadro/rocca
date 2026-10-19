@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\StatusParcela;
 use App\Enums\StatusSemana;
 use App\Models\Clinica;
 use App\Models\FinanceiroPagamento;
@@ -113,10 +112,10 @@ class DashboardController extends Controller
 
         $recebido = round((float) $pagamentos->sum('valor'), 2);
 
-        // Parcelas em aberto com vencimento no passado (não só as do período)
+        // Parcelas vencidas: em aberto E de semana já aplicada (quem não foi
+        // aplicado não fica vencido, mesmo com a data passada)
         $vencido = (float) FinanceiroParcela::query()
-            ->whereIn('status', [StatusParcela::Aberta->value, StatusParcela::Parcial->value])
-            ->where('vencimento', '<', now()->toDateString())
+            ->vencidas()
             ->selectRaw('COALESCE(SUM(valor - valor_pago), 0) as aberto')
             ->value('aberto');
 
@@ -319,8 +318,10 @@ class DashboardController extends Controller
      */
     private function blocoOperacional(): array
     {
+        // Quem está esperando agora: só a fila de aplicação (aplicação parcial é
+        // o paciente que voltou para casa e só volta para a fila no retorno)
         $naFila = PrescricaoSemana::query()
-            ->whereIn('status', [StatusSemana::FilaAplicacao, StatusSemana::AplicacaoParcial])
+            ->where('status', StatusSemana::FilaAplicacao)
             ->whereDoesntHave('atendimentos', fn ($query) => $query->whereNull('finalizado_em'))
             ->count();
 

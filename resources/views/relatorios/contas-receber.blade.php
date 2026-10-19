@@ -62,7 +62,7 @@
           <tbody>
             @foreach ($parcelas as $parcela)
               @php
-                $vencida = $parcela->vencimento?->lt(now()->startOfDay());
+                $vencida = $parcela->esta_vencida;
               @endphp
 
               <tr class="{{ $vencida ? 'table-danger' : '' }}">

@@ -201,6 +201,27 @@ class PrescricaoSemana extends Model
     }
 
     /**
+     * A semana já foi aplicada? Vale como "aplicada" a semana Aplicada e a com
+     * Aplicação Parcial (o paciente veio e a aplicação foi feita, ainda que
+     * parcialmente). Semana em fila/atendimento ainda não conta.
+     *
+     * É o que decide se a parcela pode ficar vencida: quem não foi aplicado não
+     * fica com parcela vencida, mesmo com a data passada.
+     */
+    public function getFoiAplicadaAttribute(): bool
+    {
+        return in_array($this->status, [StatusSemana::Aplicada, StatusSemana::AplicacaoParcial], true);
+    }
+
+    /**
+     * Semanas já aplicadas (para consultas).
+     */
+    public function scopeAplicadas($query)
+    {
+        return $query->whereIn('status', [StatusSemana::Aplicada->value, StatusSemana::AplicacaoParcial->value]);
+    }
+
+    /**
      * Datas em que a semana foi aplicada, sem repetir e em ordem. Mais de uma
      * quando o paciente voltou em outro dia para completar a aplicação.
      *

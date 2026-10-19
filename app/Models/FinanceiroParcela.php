@@ -52,6 +52,43 @@ class FinanceiroParcela extends Model
     ];
 
     /**
+     * A parcela está vencida? SÓ quando o paciente FOI APLICADO e o valor
+     * continua em aberto.
+     *
+     * Quem não foi aplicado (a semana não aconteceu) não gera parcela vencida,
+     * mesmo com o vencimento no passado: a clínica só cobra vencido de quem foi
+     * atendido. Parcela paga ou sem nada a pagar nunca fica vencida.
+     */
+    public function getEstaVencidaAttribute(): bool
+    {
+        $emAberto = in_array($this->status, [StatusParcela::Aberta, StatusParcela::Parcial], true)
+            && $this->valor_em_aberto > 0;
+
+        if (! $emAberto) {
+            return false;
+        }
+
+        if (! $this->vencimento?->lt(now()->startOfDay())) {
+            return false;
+        }
+
+        return (bool) $this->semana?->foi_aplicada;
+    }
+
+    /**
+     * Parcelas vencidas: em aberto, com vencimento no passado e com a semana já
+     * aplicada (ver getEstaVencidaAttribute).
+     */
+    public function scopeVencidas($query)
+    {
+        return $query
+            ->whereIn('status', [StatusParcela::Aberta->value, StatusParcela::Parcial->value])
+            ->where('valor', '>', 0)
+            ->where('vencimento', '<', now()->toDateString())
+            ->whereHas('semana', fn ($semana) => $semana->aplicadas());
+    }
+
+    /**
      * Financeiro (mestre) da parcela.
      */
     public function financeiro()

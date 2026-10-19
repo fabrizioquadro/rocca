@@ -392,7 +392,7 @@ class RelatorioController extends Controller
                 'financeiro',
                 fn ($financeiro) => $financeiro->where('clinica_id', $clinicaId)
             ))
-            ->when($somenteVencidas, fn ($query) => $query->where('vencimento', '<', now()->toDateString()))
+            ->when($somenteVencidas, fn ($query) => $query->vencidas())
             ->orderBy('vencimento')
             ->get();
 
@@ -414,8 +414,11 @@ class RelatorioController extends Controller
         }
 
         $totalAberto = round((float) $parcelas->sum(fn ($parcela) => $parcela->valor_em_aberto), 2);
+
+        // Vencida é a parcela em aberto de semana JÁ APLICADA (quem não foi
+        // aplicado continua "a vencer", mesmo com a data passada)
         $totalVencido = round(
-            (float) $parcelas->filter(fn ($parcela) => $parcela->vencimento?->lt(now()->startOfDay()))
+            (float) $parcelas->filter(fn ($parcela) => $parcela->esta_vencida)
                 ->sum(fn ($parcela) => $parcela->valor_em_aberto),
             2
         );
