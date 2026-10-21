@@ -56,7 +56,7 @@ class OmieTestar extends Command
                 continue;
             }
 
-            $total = $retorno['total_de_registros'] ?? null;
+            $total = $retorno['total_de_registros'] ?? $retorno['nTotRegistros'] ?? (empty($retorno) ? 0 : null);
 
             $this->info($rotulo.': OK'.($total !== null ? " ({$total} registro(s))" : ''));
         }

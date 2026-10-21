@@ -86,11 +86,33 @@ class OmieService
     }
 
     /**
+     * Executa um método de listagem.
+     *
+     * A Omie recusa a chamada com "Não existem registros para a página" quando
+     * a lista está vazia — para uma listagem isso é simplesmente "nenhum
+     * registro", e não um erro.
+     *
+     * @throws RuntimeException
+     */
+    private function chamarLista(string $recurso, string $metodo, array $parametros = []): array
+    {
+        try {
+            return $this->chamar($recurso, $metodo, $parametros);
+        } catch (RuntimeException $e) {
+            if (str_contains($e->getMessage(), 'Não existem registros')) {
+                return [];
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
      * Lista os serviços cadastrados (cadastro fiscal usado na NFS-e).
      */
     public function listarServicos(int $pagina = 1, int $registrosPorPagina = 50): array
     {
-        return $this->chamar('servicos/servico', 'ListarCadastroServico', [
+        return $this->chamarLista('servicos/servico', 'ListarCadastroServico', [
             'nPagina' => $pagina,
             'nRegPorPagina' => $registrosPorPagina,
         ]);
@@ -101,7 +123,7 @@ class OmieService
      */
     public function listarFormasPagamento(int $pagina = 1, int $registrosPorPagina = 50): array
     {
-        return $this->chamar('produtos/formaspagvendas', 'ListarFormasPagVendas', [
+        return $this->chamarLista('produtos/formaspagvendas', 'ListarFormasPagVendas', [
             'pagina' => $pagina,
             'registros_por_pagina' => $registrosPorPagina,
         ]);
@@ -112,7 +134,7 @@ class OmieService
      */
     public function pesquisarCidades(int $pagina = 1, int $registrosPorPagina = 50): array
     {
-        return $this->chamar('geral/cidades', 'PesquisarCidades', [
+        return $this->chamarLista('geral/cidades', 'PesquisarCidades', [
             'pagina' => $pagina,
             'registros_por_pagina' => $registrosPorPagina,
         ]);
@@ -123,7 +145,7 @@ class OmieService
      */
     public function listarEmpresas(int $pagina = 1, int $registrosPorPagina = 50): array
     {
-        return $this->chamar('geral/empresas', 'ListarEmpresas', [
+        return $this->chamarLista('geral/empresas', 'ListarEmpresas', [
             'pagina' => $pagina,
             'registros_por_pagina' => $registrosPorPagina,
         ]);
@@ -134,16 +156,18 @@ class OmieService
      */
     private function mensagemDeErro(Response $resposta, mixed $corpo): ?string
     {
+        // A Omie devolve o motivo da recusa em "faultstring", inclusive com
+        // HTTP 500 — por isso a checagem vem antes do status HTTP.
+        if (is_array($corpo) && ! empty($corpo['faultstring'])) {
+            return (string) $corpo['faultstring'];
+        }
+
         if (! $resposta->successful()) {
             return 'HTTP '.$resposta->status().' — '.mb_substr(trim($resposta->body()), 0, 300);
         }
 
         if (! is_array($corpo)) {
             return 'resposta inválida (não é JSON)';
-        }
-
-        if (! empty($corpo['faultstring'])) {
-            return (string) $corpo['faultstring'];
         }
 
         return null;

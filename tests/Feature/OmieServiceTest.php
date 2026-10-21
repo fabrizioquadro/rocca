@@ -82,6 +82,18 @@ class OmieServiceTest extends TestCase
         (new OmieService)->listarEmpresas();
     }
 
+    public function test_lista_vazia_da_omie_vira_colecao_vazia(): void
+    {
+        Http::fake([
+            'app.omie.com.br/*' => Http::response([
+                'faultstring' => 'ERROR: Não existem registros para a página [1]!',
+                'faultcode' => 'SOAP-ENV:Client-5113',
+            ], 500),
+        ]);
+
+        $this->assertSame([], (new OmieService)->listarServicos());
+    }
+
     public function test_nao_chama_a_api_quando_nao_esta_configurado(): void
     {
         config([
