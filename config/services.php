@@ -35,7 +35,6 @@ return [
         'base_url' => env('FEEGOW_BASE_URL', 'https://api.feegow.com/v1/api'),
         'token' => env('FEEGOW_TOKEN'),
         'timeout' => env('FEEGOW_TIMEOUT', 30),
-
         // Agendamento da aplicação (appoints/new-appoint).
         // Procedimento 13 = "Aplicação" na licença do Instituto Rocca.
         'procedimento_aplicacao_id' => env('FEEGOW_PROCEDIMENTO_APLICACAO', 13),
@@ -43,6 +42,13 @@ return [
         'local_aplicacao_id' => env('FEEGOW_LOCAL_APLICACAO', 1),
         'profissional_aplicacao_id' => env('FEEGOW_PROFISSIONAL_APLICACAO', 0),
         'especialidade_aplicacao_id' => env('FEEGOW_ESPECIALIDADE_APLICACAO', 0),
+    ],
+
+    'omie' => [
+        'base_url' => env('OMIE_BASE_URL', 'https://app.omie.com.br/api/v1'),
+        'app_key' => env('OMIE_APP_KEY'),
+        'app_secret' => env('OMIE_APP_SECRET'),
+        'timeout' => env('OMIE_TIMEOUT', 30),
     ],
 
 ];
