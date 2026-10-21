@@ -31,6 +31,9 @@ class EnfermagemController extends Controller
             'itens.medicamento',
             'itens.combo',
         ])
+            // Prescrição excluída (soft delete) deixa as semanas para trás;
+            // elas não podem aparecer na fila nem gerar link para a prescrição.
+            ->whereHas('prescricao')
             ->where('status', StatusSemana::FilaAplicacao)
             ->whereDoesntHave('atendimentos', fn ($query) => $query->whereNull('finalizado_em'))
             ->orderByRaw('chegada_em IS NULL')

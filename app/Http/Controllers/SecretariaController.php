@@ -62,6 +62,11 @@ class SecretariaController extends Controller
             'itens.combo',
             'parcelas',
         ])
+            // A exclusão da prescrição é um soft delete e não apaga as semanas
+            // (o histórico financeiro depende delas). Sem este filtro, as
+            // semanas "órfãs" continuam aparecendo aqui e quebram a tela ao
+            // gerar o link de prescricoes.show.
+            ->whereHas('prescricao')
             ->where('status', StatusSemana::Agendada)
             ->whereDate('data_prevista', now()->toDateString())
             ->get()
