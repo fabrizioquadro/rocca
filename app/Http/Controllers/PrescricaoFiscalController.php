@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Prescricao;
+use App\Services\OmieNotaFiscalService;
 use App\Services\OmiePacienteService;
 use App\Services\OmieService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use RuntimeException;
 
 /**
@@ -20,7 +22,43 @@ class PrescricaoFiscalController extends Controller
     public function __construct(
         private OmiePacienteService $omiePaciente,
         private OmieService $omie,
+        private OmieNotaFiscalService $notas,
     ) {
+    }
+
+    /**
+     * Emite a NFS-e da prescrição (IncluirOS + FaturarOS na Omie).
+     */
+    public function emitirNota(Request $request, Prescricao $prescricao): JsonResponse
+    {
+        $dados = $request->validate([
+            'n_cod_servico' => ['required', 'integer', 'min:1'],
+            'quantidade' => ['required', 'numeric', 'min:0.01'],
+            'valor_unitario' => ['required', 'string'],
+            'descricao' => ['nullable', 'string', 'max:500'],
+            'email' => ['nullable', 'email', 'max:255'],
+        ], [
+            'n_cod_servico.required' => 'Selecione o serviço da nota.',
+            'quantidade.min' => 'Informe uma quantidade maior que zero.',
+            'valor_unitario.required' => 'Informe o valor unitário.',
+            'email.email' => 'Informe um e-mail válido.',
+        ]);
+
+        try {
+            $nota = $this->notas->emitir($prescricao, $dados);
+        } catch (RuntimeException $e) {
+            return $this->falha($e->getMessage());
+        }
+
+        return response()->json([
+            'ok' => true,
+            'mensagem' => 'Nota '.$nota->numero.' faturada na Omie.',
+            'nota' => [
+                'numero' => $nota->numero,
+                'n_cod_os' => $nota->n_cod_os,
+                'valor_total' => $nota->valor_total_formatado,
+            ],
+        ]);
     }
 
     /**

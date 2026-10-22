@@ -30,6 +30,7 @@ class PrescricaoNotaFiscal extends Model
         'cidade_prestacao',
         'email_envio',
         'status',
+        'mensagem_erro',
         'n_cod_os',
         'n_cod_nfse',
         'emitida_em',
@@ -45,6 +46,33 @@ class PrescricaoNotaFiscal extends Model
     public function prescricao(): BelongsTo
     {
         return $this->belongsTo(Prescricao::class, 'prescricao_id');
+    }
+
+    /**
+     * Rótulo do status para a tela.
+     */
+    public function getStatusLabelAttribute(): string
+    {
+        return match ($this->status) {
+            'processando' => 'Processando',
+            'faturando' => 'Faturando',
+            'faturada' => 'Faturada',
+            'erro' => 'Erro',
+            default => ucfirst((string) $this->status),
+        };
+    }
+
+    /**
+     * Cor do badge do status.
+     */
+    public function getStatusCorAttribute(): string
+    {
+        return match ($this->status) {
+            'faturada' => 'success',
+            'erro' => 'danger',
+            'faturando' => 'info',
+            default => 'secondary',
+        };
     }
 
     /**

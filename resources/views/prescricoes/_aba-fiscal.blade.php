@@ -119,6 +119,7 @@
               <label class="form-label" for="fiscal_servico">Serviço</label>
               <select
                 id="fiscal_servico"
+                name="n_cod_servico"
                 class="form-select"
                 data-fiscal-servicos
                 data-url="{{ route('prescricoes.fiscal.servicos') }}">
@@ -133,6 +134,7 @@
                 type="number"
                 class="form-control"
                 id="fiscal_quantidade"
+                name="quantidade"
                 step="0.01"
                 min="0"
                 value="1"
@@ -147,6 +149,7 @@
                   type="text"
                   class="form-control"
                   id="fiscal_valor_unitario"
+                  name="valor_unitario"
                   inputmode="decimal"
                   autocomplete="off"
                   value="0,00"
@@ -171,6 +174,7 @@
               <textarea
                 class="form-control"
                 id="fiscal_descricao"
+                name="descricao"
                 rows="3"
                 maxlength="500"
                 placeholder="Ex.: Consulta médica - Dr. Fulano"
@@ -186,6 +190,7 @@
                   type="email"
                   class="form-control"
                   id="fiscal_email"
+                  name="email"
                   value="{{ $pacienteOmie?->email }}"
                   placeholder="email@exemplo.com"
                   data-fiscal-email>
@@ -225,13 +230,19 @@
             </ul>
 
             <div class="mt-auto">
-              <button type="button" class="btn btn-primary w-100" disabled>
+              <button
+                type="button"
+                class="btn btn-primary w-100"
+                data-fiscal-emitir
+                data-url="{{ route('prescricoes.fiscal.notas.store', $prescricao) }}">
                 <i class="ri-send-plane-line me-1"></i>Emitir nota
               </button>
 
               <small class="d-block text-muted text-center mt-2">
-                Emissão habilitada na próxima etapa
+                A nota é faturada na Omie e enviada para o e-mail informado.
               </small>
+
+              <div class="alert alert-danger mt-3 mb-0 d-none" role="alert" data-fiscal-emissao-erro></div>
             </div>
           </div>
         </div>
@@ -443,6 +454,71 @@
       valorUnitario.addEventListener('input', () => {
         mascararValor();
         recalcular();
+      });
+
+      // Emissão: envia os campos para a Omie (IncluirOS + FaturarOS)
+      const botaoEmitir = formulario.querySelector('[data-fiscal-emitir]');
+      const erroEmissao = formulario.querySelector('[data-fiscal-emissao-erro]');
+      const csrf = '{{ csrf_token() }}';
+
+      const mostrarErro = (mensagem) => {
+        erroEmissao.textContent = mensagem;
+        erroEmissao.classList.remove('d-none');
+      };
+
+      botaoEmitir.addEventListener('click', async () => {
+        erroEmissao.classList.add('d-none');
+
+        if (!select.value) {
+          mostrarErro('Selecione o serviço da nota.');
+
+          return;
+        }
+
+        if (valorNumerico(valorUnitario.value) <= 0) {
+          mostrarErro('Informe o valor unitário.');
+
+          return;
+        }
+
+        const rotulo = botaoEmitir.innerHTML;
+
+        botaoEmitir.disabled = true;
+        botaoEmitir.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Emitindo...';
+
+        const corpo = new FormData();
+        corpo.append('n_cod_servico', select.value);
+        corpo.append('quantidade', quantidade.value);
+        corpo.append('valor_unitario', valorUnitario.value);
+        corpo.append('descricao', formulario.querySelector('[data-fiscal-descricao]').value);
+        corpo.append('email', formulario.querySelector('[data-fiscal-email]').value);
+
+        try {
+          const resposta = await fetch(botaoEmitir.dataset.url, {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json',
+              'X-CSRF-TOKEN': csrf,
+            },
+            body: corpo,
+          });
+
+          const dados = await resposta.json().catch(() => ({}));
+
+          if (!resposta.ok || !dados.ok) {
+            const validacao = dados.errors ? Object.values(dados.errors).flat()[0] : null;
+
+            throw new Error(dados.mensagem || validacao || 'Não foi possível emitir a nota.');
+          }
+
+          const destino = new URL(window.location.href);
+          destino.searchParams.set('aba', 'fiscal');
+          window.location.replace(destino.toString());
+        } catch (e) {
+          botaoEmitir.disabled = false;
+          botaoEmitir.innerHTML = rotulo;
+          mostrarErro(e.message);
+        }
       });
 
       carregarServicos();

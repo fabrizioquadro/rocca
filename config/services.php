@@ -49,6 +49,12 @@ return [
         'app_key' => env('OMIE_APP_KEY'),
         'app_secret' => env('OMIE_APP_SECRET'),
         'timeout' => env('OMIE_TIMEOUT', 30),
+
+        // Dados fixos da emissão da NFS-e (mudam por conta do Omie).
+        'cidade_prestacao' => env('OMIE_CIDADE_PRESTACAO', 'SAO PAULO (SP)'),
+        'categoria' => env('OMIE_CATEGORIA'),
+        'conta_corrente' => env('OMIE_CONTA_CORRENTE'),
+        'condicao_pagamento' => env('OMIE_CONDICAO_PAGAMENTO', '000'),
     ],
 
 ];

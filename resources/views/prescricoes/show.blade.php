@@ -889,9 +889,42 @@
 
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
             <h6 class="fw-semibold mb-0">Notas fiscais</h6>
+
+            @if ($prescricao->notasFiscais->isNotEmpty())
+              <span class="text-muted small">{{ $prescricao->notasFiscais->count() }} nota(s)</span>
+            @endif
           </div>
 
-          <p class="text-muted mb-0">Nenhuma nota fiscal emitida para esta prescrição.</p>
+          @forelse ($prescricao->notasFiscais as $nota)
+            <div class="border rounded p-3 mb-2">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                  <span class="badge bg-label-primary">Nota {{ $nota->numero }}</span>
+                  <span class="badge bg-label-{{ $nota->status_cor }}">{{ $nota->status_label }}</span>
+                  <span class="text-muted small">{{ $nota->codigo_integracao }}</span>
+                </div>
+
+                <span class="fw-semibold">{{ $nota->valor_total_formatado }}</span>
+              </div>
+
+              <div class="text-body-secondary small mt-1">
+                {{ $nota->descricao_servico ?: 'Serviço #'.$nota->n_cod_servico }}
+                · Qtd {{ rtrim(rtrim(number_format((float) $nota->quantidade, 2, ',', '.'), '0'), ',') }}
+                @if ($nota->n_cod_os)
+                  · OS {{ $nota->n_cod_os }}
+                @endif
+                @if ($nota->emitida_em)
+                  · {{ $nota->emitida_em->format('d/m/Y H:i') }}
+                @endif
+              </div>
+
+              @if ($nota->mensagem_erro)
+                <div class="text-danger small mt-1">{{ $nota->mensagem_erro }}</div>
+              @endif
+            </div>
+          @empty
+            <p class="text-muted mb-0">Nenhuma nota fiscal emitida para esta prescrição.</p>
+          @endforelse
         </div>
 
         {{-- Observações: cada registro guarda o texto, o autor e a data/hora --}}

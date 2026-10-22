@@ -228,6 +228,7 @@ Route::middleware('auth')->group(function () {
     // Duas chamadas para a tela mostrar cada etapa da integração.
     Route::post('/prescricoes/{prescricao}/fiscal/paciente/feegow', [PrescricaoFiscalController::class, 'buscarPacienteFeegow'])->name('prescricoes.fiscal.paciente.feegow');
     Route::post('/prescricoes/{prescricao}/fiscal/paciente/omie', [PrescricaoFiscalController::class, 'registrarPacienteOmie'])->name('prescricoes.fiscal.paciente.omie');
+    Route::post('/prescricoes/{prescricao}/fiscal/notas', [PrescricaoFiscalController::class, 'emitirNota'])->name('prescricoes.fiscal.notas.store');
 
     // Anexos da prescrição (exames, receitas, documentos e etc.)
     Route::post('/prescricoes/{prescricao}/anexos', [PrescricaoController::class, 'storeAnexo'])->name('prescricoes.anexos.store');
