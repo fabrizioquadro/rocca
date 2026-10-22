@@ -31,6 +31,8 @@ class Paciente extends Model
         'email',
         'observacao',
         'dados',
+        'codigo_cliente_omie',
+        'omie_integrado_em',
     ];
 
     /**
@@ -41,7 +43,16 @@ class Paciente extends Model
     protected $casts = [
         'nascimento' => 'date',
         'dados' => 'array',
+        'omie_integrado_em' => 'datetime',
     ];
+
+    /**
+     * O paciente já está cadastrado como cliente na Omie?
+     */
+    public function getIntegradoOmieAttribute(): bool
+    {
+        return ! empty($this->codigo_cliente_omie);
+    }
 
     /**
      * Nascimento formatado (d/m/Y).

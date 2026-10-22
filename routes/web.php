@@ -21,6 +21,7 @@ use App\Http\Controllers\GrupoController;
 use App\Http\Controllers\MedicamentoController;
 use App\Http\Controllers\PacienteController;
 use App\Http\Controllers\PrescricaoController;
+use App\Http\Controllers\PrescricaoFiscalController;
 use App\Http\Controllers\PrescricaoSemanaController;
 use App\Http\Controllers\RelatorioController;
 use App\Http\Controllers\SecretariaController;
@@ -218,6 +219,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/prescricoes/{prescricao}/prescricao/pdf', [PrescricaoController::class, 'imprimirPrescricaoPdf'])->name('prescricoes.imprimir.prescricao.pdf');
 
     Route::delete('/prescricoes/{prescricao}', [PrescricaoController::class, 'destroy'])->middleware('perfil:administrador')->name('prescricoes.destroy');
+
+    // Aba Fiscal: integração do paciente (tomador) com a Omie.
+    // Duas chamadas para a tela mostrar cada etapa da integração.
+    Route::post('/prescricoes/{prescricao}/fiscal/paciente/feegow', [PrescricaoFiscalController::class, 'buscarPacienteFeegow'])->name('prescricoes.fiscal.paciente.feegow');
+    Route::post('/prescricoes/{prescricao}/fiscal/paciente/omie', [PrescricaoFiscalController::class, 'registrarPacienteOmie'])->name('prescricoes.fiscal.paciente.omie');
 
     // Anexos da prescrição (exames, receitas, documentos e etc.)
     Route::post('/prescricoes/{prescricao}/anexos', [PrescricaoController::class, 'storeAnexo'])->name('prescricoes.anexos.store');

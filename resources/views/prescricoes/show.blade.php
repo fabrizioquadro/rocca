@@ -885,6 +885,8 @@
 
         {{-- Fiscal: notas fiscais (NFS-e) emitidas para esta prescrição --}}
         <div class="tab-pane fade {{ $abaAtiva === 'fiscal' ? 'show active' : '' }}" id="aba-fiscal" role="tabpanel">
+          @include('prescricoes._aba-fiscal')
+
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
             <h6 class="fw-semibold mb-0">Notas fiscais</h6>
           </div>

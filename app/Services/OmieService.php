@@ -79,7 +79,7 @@ class OmieService
                 'erro' => $erro,
             ]);
 
-            throw new RuntimeException($metodo.': '.$erro);
+            throw new RuntimeException($metodo.': '.$this->mensagemAmigavel($erro));
         }
 
         return is_array($corpo) ? $corpo : [];
@@ -149,6 +149,78 @@ class OmieService
             'pagina' => $pagina,
             'registros_por_pagina' => $registrosPorPagina,
         ]);
+    }
+
+    /**
+     * Consulta um cliente pelo código da Omie (null quando não existe).
+     */
+    public function consultarClientePorCodigo(int $codigoCliente): ?array
+    {
+        try {
+            return $this->chamar('geral/clientes', 'ConsultarCliente', [
+                'codigo_cliente_omie' => $codigoCliente,
+            ]);
+        } catch (RuntimeException $e) {
+            if ($this->clienteNaoEncontrado($e)) {
+                return null;
+            }
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Localiza um cliente pelo CPF/CNPJ (aceita com ou sem máscara).
+     */
+    public function buscarClientePorCpf(string $cpf): ?array
+    {
+        try {
+            $retorno = $this->chamar('geral/clientes', 'ListarClientes', [
+                'pagina' => 1,
+                'registros_por_pagina' => 1,
+                'clientesFiltro' => ['cnpj_cpf' => $cpf],
+            ]);
+        } catch (RuntimeException $e) {
+            if ($this->clienteNaoEncontrado($e)) {
+                return null;
+            }
+
+            throw $e;
+        }
+
+        return $retorno['clientes_cadastro'][0] ?? null;
+    }
+
+    /**
+     * Cria ou altera o cliente pelo CPF/CNPJ (idempotente).
+     */
+    public function incluirClientePorCpf(array $dados): array
+    {
+        return $this->chamar('geral/clientes', 'UpsertClienteCpfCnpj', $dados);
+    }
+
+    /**
+     * A Omie bloqueia chamadas idênticas repetidas em sequência: traduz o
+     * aviso técnico para algo que faça sentido na tela.
+     */
+    private function mensagemAmigavel(string $mensagem): string
+    {
+        if (str_contains($mensagem, 'Consumo redundante')) {
+            return 'A Omie bloqueou uma chamada repetida. Aguarde alguns segundos e tente novamente.';
+        }
+
+        return $mensagem;
+    }
+
+    /**
+     * A Omie sinaliza "cliente inexistente" como erro, não como lista vazia.
+     */
+    private function clienteNaoEncontrado(RuntimeException $e): bool
+    {
+        $mensagem = mb_strtolower($e->getMessage());
+
+        return str_contains($mensagem, 'não cadastrado')
+            || str_contains($mensagem, 'não existem registros');
     }
 
     /**
