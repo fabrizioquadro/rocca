@@ -81,7 +81,7 @@
   </div>
 
   <div class="card" id="abas-prescricao">
-    @php $abaAtiva = in_array(request('aba'), ['resumo', 'semanas', 'financeiro', 'observacoes', 'logs'], true) ? request('aba') : 'resumo'; @endphp
+    @php $abaAtiva = in_array(request('aba'), ['resumo', 'semanas', 'financeiro', 'fiscal', 'observacoes', 'logs'], true) ? request('aba') : 'resumo'; @endphp
 
     <div class="card-header p-0 pb-5">
       <div class="nav-align-top">
@@ -120,6 +120,19 @@
               aria-controls="aba-financeiro"
               aria-selected="{{ $abaAtiva === 'financeiro' ? 'true' : 'false' }}">
               <i class="ri-money-dollar-circle-line me-1"></i>Financeiro
+            </button>
+          </li>
+
+          <li class="nav-item">
+            <button
+              type="button"
+              class="nav-link {{ $abaAtiva === 'fiscal' ? 'active' : '' }}"
+              role="tab"
+              data-bs-toggle="tab"
+              data-bs-target="#aba-fiscal"
+              aria-controls="aba-fiscal"
+              aria-selected="{{ $abaAtiva === 'fiscal' ? 'true' : 'false' }}">
+              <i class="ri-file-paper-2-line me-1"></i>Fiscal
             </button>
           </li>
 
@@ -868,6 +881,15 @@
           @include('prescricoes._modal-pagamento')
         @endif
       @endif
+        </div>
+
+        {{-- Fiscal: notas fiscais (NFS-e) emitidas para esta prescrição --}}
+        <div class="tab-pane fade {{ $abaAtiva === 'fiscal' ? 'show active' : '' }}" id="aba-fiscal" role="tabpanel">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h6 class="fw-semibold mb-0">Notas fiscais</h6>
+          </div>
+
+          <p class="text-muted mb-0">Nenhuma nota fiscal emitida para esta prescrição.</p>
         </div>
 
         {{-- Observações: cada registro guarda o texto, o autor e a data/hora --}}
