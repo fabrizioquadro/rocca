@@ -57,6 +57,118 @@
   @endunless
 </div>
 
+@if ($integradoOmie)
+  @php
+    // Número da próxima nota da prescrição: compõe o código de integração da OS
+    // na Omie ("{prescricao_id}/{numero}").
+    $proximaNota = $prescricao->notasFiscais()->count() + 1;
+  @endphp
+
+  <div class="card mb-4" data-fiscal-emissao>
+    <div class="card-body">
+      <h6 class="fw-semibold mb-3">Emitir nota fiscal</h6>
+
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label" for="fiscal_codigo_os">Código da OS</label>
+          <input
+            type="text"
+            class="form-control"
+            id="fiscal_codigo_os"
+            value="{{ $prescricao->id }}/{{ $proximaNota }}"
+            readonly>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label" for="fiscal_data">Data</label>
+          <input
+            type="text"
+            class="form-control"
+            id="fiscal_data"
+            value="{{ now()->format('d/m/Y') }}"
+            readonly>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label" for="fiscal_servico">Serviço</label>
+          <select
+            id="fiscal_servico"
+            class="form-select"
+            data-fiscal-servicos
+            data-url="{{ route('prescricoes.fiscal.servicos') }}">
+            <option value="">Carregando serviços...</option>
+          </select>
+          <div class="form-text text-danger d-none" data-fiscal-servicos-erro></div>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Cidade de prestação</label>
+          <input type="text" class="form-control" value="São Paulo" readonly>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label" for="fiscal_quantidade">Quantidade</label>
+          <input
+            type="number"
+            class="form-control"
+            id="fiscal_quantidade"
+            step="0.01"
+            min="0"
+            value="1"
+            data-fiscal-quantidade>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label" for="fiscal_valor_unitario">Valor unitário</label>
+          <input
+            type="number"
+            class="form-control"
+            id="fiscal_valor_unitario"
+            step="0.01"
+            min="0"
+            value="0.00"
+            data-fiscal-valor-unitario>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label" for="fiscal_valor_total">Valor total</label>
+          <input type="text" class="form-control" id="fiscal_valor_total" value="R$ 0,00" readonly>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label" for="fiscal_email">E-mail do paciente</label>
+          <input
+            type="email"
+            class="form-control"
+            id="fiscal_email"
+            value="{{ $pacienteOmie?->email }}"
+            placeholder="email@exemplo.com"
+            data-fiscal-email>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label" for="fiscal_descricao">Descrição do serviço</label>
+          <textarea
+            class="form-control"
+            id="fiscal_descricao"
+            rows="2"
+            maxlength="500"
+            placeholder="Descrição que sai no item da nota"
+            data-fiscal-descricao></textarea>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap justify-content-end align-items-center gap-2 mt-4">
+        <small class="text-muted">A emissão será habilitada na próxima etapa.</small>
+
+        <button type="button" class="btn btn-primary" disabled>
+          <i class="ri-send-plane-line me-1"></i>Emitir nota
+        </button>
+      </div>
+    </div>
+  </div>
+@endif
+
 @push('scripts')
   <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -142,6 +254,94 @@
           botao.disabled = false;
         }
       });
+    });
+  </script>
+
+  {{-- Formulário de emissão: serviços da Omie e cálculo do total --}}
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const formulario = document.querySelector('[data-fiscal-emissao]');
+
+      if (!formulario) return;
+
+      const select = formulario.querySelector('[data-fiscal-servicos]');
+      const quantidade = formulario.querySelector('[data-fiscal-quantidade]');
+      const valorUnitario = formulario.querySelector('[data-fiscal-valor-unitario]');
+      const valorTotal = document.getElementById('fiscal_valor_total');
+      const erroServicos = formulario.querySelector('[data-fiscal-servicos-erro]');
+
+      const moeda = (valor) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+      const recalcular = () => {
+        const total = (parseFloat(quantidade.value) || 0) * (parseFloat(valorUnitario.value) || 0);
+        valorTotal.value = moeda(total);
+      };
+
+      const preencherServicos = (lista) => {
+        select.innerHTML = '';
+
+        if (lista.length === 0) {
+          select.innerHTML = '<option value="">Nenhum serviço cadastrado na Omie</option>';
+          select.disabled = true;
+
+          return;
+        }
+
+        const vazio = document.createElement('option');
+        vazio.value = '';
+        vazio.textContent = 'Selecione o serviço';
+        select.appendChild(vazio);
+
+        lista.forEach((servico) => {
+          const opcao = document.createElement('option');
+          opcao.value = servico.codigo;
+          opcao.dataset.preco = servico.preco;
+          opcao.textContent =
+            (servico.codigo_exibicao ? servico.codigo_exibicao + ' - ' : '') +
+            servico.descricao +
+            ' (' + moeda(servico.preco) + ')';
+
+          select.appendChild(opcao);
+        });
+      };
+
+      const carregarServicos = async () => {
+        try {
+          const resposta = await fetch(select.dataset.url, {
+            headers: { 'Accept': 'application/json' },
+          });
+
+          const dados = await resposta.json().catch(() => ({}));
+
+          if (!resposta.ok || !dados.ok) {
+            throw new Error(dados.mensagem || 'Não foi possível carregar os serviços da Omie.');
+          }
+
+          preencherServicos(dados.servicos || []);
+        } catch (e) {
+          select.innerHTML = '<option value="">Não foi possível carregar</option>';
+          select.disabled = true;
+          erroServicos.textContent = e.message;
+          erroServicos.classList.remove('d-none');
+        }
+      };
+
+      // Ao escolher o serviço, sugere o preço cadastrado na Omie (editável)
+      select.addEventListener('change', () => {
+        const preco = parseFloat(select.selectedOptions[0]?.dataset.preco || 0);
+
+        if (preco > 0) {
+          valorUnitario.value = preco.toFixed(2);
+        }
+
+        recalcular();
+      });
+
+      quantidade.addEventListener('input', recalcular);
+      valorUnitario.addEventListener('input', recalcular);
+
+      carregarServicos();
+      recalcular();
     });
   </script>
 @endpush

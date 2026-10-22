@@ -87,6 +87,14 @@ class Prescricao extends Model
     }
 
     /**
+     * Notas fiscais (NFS-e) emitidas para a prescrição.
+     */
+    public function notasFiscais()
+    {
+        return $this->hasMany(PrescricaoNotaFiscal::class, 'prescricao_id')->orderBy('numero');
+    }
+
+    /**
      * Anexos da prescrição.
      */
     public function anexos()

@@ -199,6 +199,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/prescricoes/pacientes', [PrescricaoController::class, 'buscarPacientes'])->name('prescricoes.pacientes');
     Route::get('/prescricoes/medicos', [PrescricaoController::class, 'medicos'])->name('prescricoes.medicos');
 
+    // Serviços da Omie para o select da aba Fiscal (antes de {prescricao}
+    // para o binding não capturar "fiscal" como se fosse um id)
+    Route::get('/prescricoes/fiscal/servicos', [PrescricaoFiscalController::class, 'servicos'])->name('prescricoes.fiscal.servicos');
+
     // O paciente já tem prescrição em aberto? (aviso no cadastro)
     Route::get('/prescricoes/pacientes/{paciente}/aberta', [PrescricaoController::class, 'prescricaoAberta'])->name('prescricoes.paciente-aberta');
     Route::post('/prescricoes', [PrescricaoController::class, 'store'])->name('prescricoes.store');

@@ -4,19 +4,52 @@ namespace App\Http\Controllers;
 
 use App\Models\Prescricao;
 use App\Services\OmiePacienteService;
+use App\Services\OmieService;
 use Illuminate\Http\JsonResponse;
 use RuntimeException;
 
 /**
- * Aba Fiscal da prescrição: integração do paciente (tomador) com a Omie.
+ * Aba Fiscal da prescrição: integração do paciente (tomador) com a Omie e
+ * emissão das notas fiscais.
  *
  * A integração acontece em duas chamadas para a tela conseguir mostrar cada
  * etapa: primeiro a busca na Feegow, depois o cadastro na Omie.
  */
 class PrescricaoFiscalController extends Controller
 {
-    public function __construct(private OmiePacienteService $omiePaciente)
+    public function __construct(
+        private OmiePacienteService $omiePaciente,
+        private OmieService $omie,
+    ) {
+    }
+
+    /**
+     * Serviços cadastrados na Omie (opções do select da emissão).
+     */
+    public function servicos(): JsonResponse
     {
+        if (! $this->omie->configurado()) {
+            return $this->falha('Integração com a Omie não está configurada.');
+        }
+
+        try {
+            $retorno = $this->omie->listarServicos(1, 200);
+        } catch (RuntimeException $e) {
+            return $this->falha($e->getMessage());
+        }
+
+        $servicos = collect($retorno['cadastros'] ?? [])
+            ->map(fn (array $servico) => [
+                'codigo' => (int) ($servico['intListar']['nCodServ'] ?? 0),
+                'codigo_exibicao' => $servico['cabecalho']['cCodigo'] ?? null,
+                'descricao' => $servico['cabecalho']['cDescricao'] ?? ($servico['descricao']['cDescrCompleta'] ?? null),
+                'preco' => (float) ($servico['cabecalho']['nPrecoUnit'] ?? 0),
+                'inativo' => mb_strtoupper((string) ($servico['info']['inativo'] ?? 'N')) === 'S',
+            ])
+            ->filter(fn (array $servico) => $servico['codigo'] > 0 && ! $servico['inativo'])
+            ->values();
+
+        return response()->json(['ok' => true, 'servicos' => $servicos]);
     }
 
     /**
@@ -53,8 +86,7 @@ class PrescricaoFiscalController extends Controller
     /**
      * Passo 2: cria/atualiza o cliente na Omie e vincula ao paciente.
      */
-    public function registrarPacienteOmie(Prescricao $prescricao): JsonResponse
-    {
+    public function registrarPacienteOmie(Prescricao $prescricao): JsonResponse    {
         $paciente = $prescricao->paciente;
 
         if (! $paciente) {
