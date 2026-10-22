@@ -65,105 +65,176 @@
   @endphp
 
   <div class="card mb-4" data-fiscal-emissao>
-    <div class="card-body">
-      <h6 class="fw-semibold mb-3">Emitir nota fiscal</h6>
-
-      <div class="row g-3">
-        <div class="col-md-3">
-          <label class="form-label" for="fiscal_codigo_os">Código da OS</label>
-          <input
-            type="text"
-            class="form-control"
-            id="fiscal_codigo_os"
-            value="{{ $prescricao->id }}/{{ $proximaNota }}"
-            readonly>
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="avatar avatar-sm">
+          <span class="avatar-initial rounded-4 bg-label-primary">
+            <i class="ri-file-paper-2-line ri-20px"></i>
+          </span>
         </div>
 
-        <div class="col-md-3">
-          <label class="form-label" for="fiscal_data">Data</label>
-          <input
-            type="text"
-            class="form-control"
-            id="fiscal_data"
-            value="{{ now()->format('d/m/Y') }}"
-            readonly>
-        </div>
-
-        <div class="col-md-3">
-          <label class="form-label" for="fiscal_servico">Serviço</label>
-          <select
-            id="fiscal_servico"
-            class="form-select"
-            data-fiscal-servicos
-            data-url="{{ route('prescricoes.fiscal.servicos') }}">
-            <option value="">Carregando serviços...</option>
-          </select>
-          <div class="form-text text-danger d-none" data-fiscal-servicos-erro></div>
-        </div>
-
-        <div class="col-md-3">
-          <label class="form-label">Cidade de prestação</label>
-          <input type="text" class="form-control" value="São Paulo" readonly>
-        </div>
-
-        <div class="col-md-3">
-          <label class="form-label" for="fiscal_quantidade">Quantidade</label>
-          <input
-            type="number"
-            class="form-control"
-            id="fiscal_quantidade"
-            step="0.01"
-            min="0"
-            value="1"
-            data-fiscal-quantidade>
-        </div>
-
-        <div class="col-md-3">
-          <label class="form-label" for="fiscal_valor_unitario">Valor unitário</label>
-          <input
-            type="number"
-            class="form-control"
-            id="fiscal_valor_unitario"
-            step="0.01"
-            min="0"
-            value="0.00"
-            data-fiscal-valor-unitario>
-        </div>
-
-        <div class="col-md-3">
-          <label class="form-label" for="fiscal_valor_total">Valor total</label>
-          <input type="text" class="form-control" id="fiscal_valor_total" value="R$ 0,00" readonly>
-        </div>
-
-        <div class="col-md-3">
-          <label class="form-label" for="fiscal_email">E-mail do paciente</label>
-          <input
-            type="email"
-            class="form-control"
-            id="fiscal_email"
-            value="{{ $pacienteOmie?->email }}"
-            placeholder="email@exemplo.com"
-            data-fiscal-email>
-        </div>
-
-        <div class="col-12">
-          <label class="form-label" for="fiscal_descricao">Descrição do serviço</label>
-          <textarea
-            class="form-control"
-            id="fiscal_descricao"
-            rows="2"
-            maxlength="500"
-            placeholder="Descrição que sai no item da nota"
-            data-fiscal-descricao></textarea>
+        <div>
+          <h6 class="mb-0">Emitir nota fiscal</h6>
+          <small class="text-muted">NFS-e de serviço · {{ $pacienteOmie?->nome }}</small>
         </div>
       </div>
 
-      <div class="d-flex flex-wrap justify-content-end align-items-center gap-2 mt-4">
-        <small class="text-muted">A emissão será habilitada na próxima etapa.</small>
+      <span class="badge bg-label-primary">Nota {{ $proximaNota }}</span>
+    </div>
 
-        <button type="button" class="btn btn-primary" disabled>
-          <i class="ri-send-plane-line me-1"></i>Emitir nota
-        </button>
+    <div class="card-body">
+      <div class="row g-6">
+        {{-- Formulário --}}
+        <div class="col-lg-8">
+          <div class="row g-4">
+            <div class="col-sm-4">
+              <label class="form-label" for="fiscal_codigo_os">Código da OS</label>
+              <input
+                type="text"
+                class="form-control bg-lighter"
+                id="fiscal_codigo_os"
+                value="{{ $prescricao->id }}/{{ $proximaNota }}"
+                readonly>
+              <div class="form-text">Prescrição / número da nota</div>
+            </div>
+
+            <div class="col-sm-4">
+              <label class="form-label" for="fiscal_data">Data</label>
+              <input
+                type="text"
+                class="form-control bg-lighter"
+                id="fiscal_data"
+                value="{{ now()->format('d/m/Y') }}"
+                readonly>
+              <div class="form-text">Data de hoje</div>
+            </div>
+
+            <div class="col-sm-4">
+              <label class="form-label">Cidade de prestação</label>
+              <input type="text" class="form-control bg-lighter" value="São Paulo" readonly>
+              <div class="form-text">Fixa para esta unidade</div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="fiscal_servico">Serviço</label>
+              <select
+                id="fiscal_servico"
+                class="form-select"
+                data-fiscal-servicos
+                data-url="{{ route('prescricoes.fiscal.servicos') }}">
+                <option value="">Carregando serviços...</option>
+              </select>
+              <div class="form-text text-danger d-none" data-fiscal-servicos-erro></div>
+            </div>
+
+            <div class="col-sm-4">
+              <label class="form-label" for="fiscal_quantidade">Quantidade</label>
+              <input
+                type="number"
+                class="form-control"
+                id="fiscal_quantidade"
+                step="0.01"
+                min="0"
+                value="1"
+                data-fiscal-quantidade>
+            </div>
+
+            <div class="col-sm-4">
+              <label class="form-label" for="fiscal_valor_unitario">Valor unitário</label>
+              <div class="input-group">
+                <span class="input-group-text">R$</span>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="fiscal_valor_unitario"
+                  step="0.01"
+                  min="0"
+                  value="0.00"
+                  data-fiscal-valor-unitario>
+              </div>
+              <div class="form-text">Sugerido pelo cadastro na Omie</div>
+            </div>
+
+            <div class="col-sm-4">
+              <label class="form-label" for="fiscal_valor_total">Valor total</label>
+              <input
+                type="text"
+                class="form-control bg-lighter fw-semibold"
+                id="fiscal_valor_total"
+                value="R$ 0,00"
+                readonly>
+              <div class="form-text">Quantidade × valor unitário</div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="fiscal_descricao">Descrição do serviço</label>
+              <textarea
+                class="form-control"
+                id="fiscal_descricao"
+                rows="3"
+                maxlength="500"
+                placeholder="Ex.: Consulta médica - Dr. Fulano"
+                data-fiscal-descricao></textarea>
+              <div class="form-text">Texto que sai no item da nota.</div>
+            </div>
+
+            <div class="col-md-8">
+              <label class="form-label" for="fiscal_email">E-mail do paciente</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="ri-mail-line"></i></span>
+                <input
+                  type="email"
+                  class="form-control"
+                  id="fiscal_email"
+                  value="{{ $pacienteOmie?->email }}"
+                  placeholder="email@exemplo.com"
+                  data-fiscal-email>
+              </div>
+              <div class="form-text">Usado para enviar a nota ao paciente.</div>
+            </div>
+          </div>
+        </div>
+
+        {{-- Resumo --}}
+        <div class="col-lg-4">
+          <div class="rounded-4 border p-4 h-100 d-flex flex-column bg-lighter">
+            <small class="text-muted text-uppercase">Total da nota</small>
+            <div class="display-6 fw-semibold text-primary mb-4" data-fiscal-total-texto>R$ 0,00</div>
+
+            <ul class="list-unstyled small mb-4">
+              <li class="d-flex justify-content-between gap-2 py-2 border-bottom">
+                <span class="text-muted">Nota</span>
+                <span class="fw-semibold">{{ $proximaNota }}</span>
+              </li>
+              <li class="d-flex justify-content-between gap-2 py-2 border-bottom">
+                <span class="text-muted">Serviço</span>
+                <span class="fw-semibold text-end" data-fiscal-resumo-servico>—</span>
+              </li>
+              <li class="d-flex justify-content-between gap-2 py-2 border-bottom">
+                <span class="text-muted">Quantidade</span>
+                <span class="fw-semibold" data-fiscal-resumo-quantidade>1</span>
+              </li>
+              <li class="d-flex justify-content-between gap-2 py-2 border-bottom">
+                <span class="text-muted">Data</span>
+                <span class="fw-semibold">{{ now()->format('d/m/Y') }}</span>
+              </li>
+              <li class="d-flex justify-content-between gap-2 py-2">
+                <span class="text-muted">Cidade</span>
+                <span class="fw-semibold">São Paulo</span>
+              </li>
+            </ul>
+
+            <div class="mt-auto">
+              <button type="button" class="btn btn-primary w-100" disabled>
+                <i class="ri-send-plane-line me-1"></i>Emitir nota
+              </button>
+
+              <small class="d-block text-muted text-center mt-2">
+                Emissão habilitada na próxima etapa
+              </small>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -268,13 +339,20 @@
       const quantidade = formulario.querySelector('[data-fiscal-quantidade]');
       const valorUnitario = formulario.querySelector('[data-fiscal-valor-unitario]');
       const valorTotal = document.getElementById('fiscal_valor_total');
+      const totalTexto = formulario.querySelector('[data-fiscal-total-texto]');
+      const resumoServico = formulario.querySelector('[data-fiscal-resumo-servico]');
+      const resumoQuantidade = formulario.querySelector('[data-fiscal-resumo-quantidade]');
       const erroServicos = formulario.querySelector('[data-fiscal-servicos-erro]');
 
       const moeda = (valor) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
       const recalcular = () => {
         const total = (parseFloat(quantidade.value) || 0) * (parseFloat(valorUnitario.value) || 0);
-        valorTotal.value = moeda(total);
+        const texto = moeda(total);
+
+        valorTotal.value = texto;
+        totalTexto.textContent = texto;
+        resumoQuantidade.textContent = quantidade.value || '0';
       };
 
       const preencherServicos = (lista) => {
@@ -296,6 +374,7 @@
           const opcao = document.createElement('option');
           opcao.value = servico.codigo;
           opcao.dataset.preco = servico.preco;
+          opcao.dataset.descricao = servico.descricao;
           opcao.textContent =
             (servico.codigo_exibicao ? servico.codigo_exibicao + ' - ' : '') +
             servico.descricao +
@@ -328,11 +407,14 @@
 
       // Ao escolher o serviço, sugere o preço cadastrado na Omie (editável)
       select.addEventListener('change', () => {
-        const preco = parseFloat(select.selectedOptions[0]?.dataset.preco || 0);
+        const opcao = select.selectedOptions[0];
+        const preco = parseFloat(opcao?.dataset.preco || 0);
 
         if (preco > 0) {
           valorUnitario.value = preco.toFixed(2);
         }
+
+        resumoServico.textContent = opcao?.dataset.descricao || '—';
 
         recalcular();
       });
