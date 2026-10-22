@@ -144,12 +144,12 @@
               <div class="input-group">
                 <span class="input-group-text">R$</span>
                 <input
-                  type="number"
+                  type="text"
                   class="form-control"
                   id="fiscal_valor_unitario"
-                  step="0.01"
-                  min="0"
-                  value="0.00"
+                  inputmode="decimal"
+                  autocomplete="off"
+                  value="0,00"
                   data-fiscal-valor-unitario>
               </div>
               <div class="form-text">Sugerido pelo cadastro na Omie</div>
@@ -346,8 +346,28 @@
 
       const moeda = (valor) => valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+      const formatarValor = (valor) => (Number(valor) || 0).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+
+      // Lê "1.234,56" como número
+      const valorNumerico = (texto) => {
+        const limpo = String(texto || '').replace(/\./g, '').replace(',', '.');
+        const valor = parseFloat(limpo);
+
+        return Number.isFinite(valor) ? valor : 0;
+      };
+
+      // Máscara de real: os dígitos entram pela direita (centavos)
+      const mascararValor = () => {
+        const digitos = valorUnitario.value.replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
+
+        valorUnitario.value = formatarValor(parseInt(digitos || '0', 10) / 100);
+      };
+
       const recalcular = () => {
-        const total = (parseFloat(quantidade.value) || 0) * (parseFloat(valorUnitario.value) || 0);
+        const total = (parseFloat(quantidade.value) || 0) * valorNumerico(valorUnitario.value);
         const texto = moeda(total);
 
         valorTotal.value = texto;
@@ -411,7 +431,7 @@
         const preco = parseFloat(opcao?.dataset.preco || 0);
 
         if (preco > 0) {
-          valorUnitario.value = preco.toFixed(2);
+          valorUnitario.value = formatarValor(preco);
         }
 
         resumoServico.textContent = opcao?.dataset.descricao || '—';
@@ -420,7 +440,10 @@
       });
 
       quantidade.addEventListener('input', recalcular);
-      valorUnitario.addEventListener('input', recalcular);
+      valorUnitario.addEventListener('input', () => {
+        mascararValor();
+        recalcular();
+      });
 
       carregarServicos();
       recalcular();
