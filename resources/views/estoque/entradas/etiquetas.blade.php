@@ -11,12 +11,16 @@
        2mm de margem em cada lateral (30+3+30+3+30 = 96 + 2 + 2 = 100).
 
        O PASSO da bobina (altura da etiqueta + espaço entre as linhas =
-       15 + 2 = 17mm) é o que a impressora avança por linha e vira o
-       comprimento do papel no @page: uma linha de etiquetas por página.
-       Assim cada linha começa no topo da sua etiqueta e o desalinhamento
-       NÃO acumula de uma linha para a outra. Se a bobina do cliente tiver
-       outro passo, ajustar as variáveis abaixo e o `size` do @page para o
-       mesmo valor.
+       15 + 2 = 17mm) é o que a impressora avança por linha: uma linha de
+       etiquetas por página. Assim cada linha começa no topo da sua
+       etiqueta e o desalinhamento NÃO acumula de uma linha para a outra.
+
+       A orientação é forçada em PAISAGEM no @page (abaixo): o diálogo de
+       impressão já abre em paisagem, sem o usuário precisar trocar. O CSS
+       não aceita combinar `size: <medidas>` com `landscape` (o navegador
+       descarta a regra), então as medidas de cada página vêm do papel
+       cadastrado no driver — mantenha a bobina de 100mm x 17mm como papel
+       padrão da impressora.
        ============================================================ */
     :root {
       --bobina-largura: 100mm;
@@ -26,11 +30,25 @@
       --etiqueta-espaco-coluna: 3mm;
       --etiqueta-espaco-linha: 2mm;
       --etiqueta-por-linha: 3;
+
+      /* Ajuste fino da impressão, em mm: positivo desloca para a
+         direita/baixo. Compensa a área não imprimível do driver quando o
+         conteúdo não cai no centro da etiqueta. O padrão (1mm para a
+         direita) corrige a margem não imprimível à esquerda da bobina;
+         o valor pode ser calibrado na barra acima e fica salvo no
+         computador da impressão. */
+      --ajuste-x: 1mm;
+      --ajuste-y: 0mm;
     }
 
-    /* Comprimento do papel = passo da bobina (15mm da etiqueta + 2mm de espaço). */
+    /* Paisagem fixa: o diálogo de impressão do navegador já abre assim.
+       As medidas da página são as do papel padrão do driver (bobina de
+       100mm de largura por 17mm de comprimento) — o CSS não permite
+       `size: <medidas> landscape` (o navegador descarta a regra inteira).
+       Se um dia o driver passar a respeitar medidas personalizadas e a
+       orientação ficar sobrando, basta trocar por `size: 100mm 17mm;`. */
     @page {
-      size: 100mm 17mm;
+      size: landscape;
       margin: 0;
     }
 
@@ -55,9 +73,16 @@
       padding: 0 var(--bobina-margem-lateral);
     }
 
+    /* Alinhado à esquerda de propósito: numa linha incompleta (última
+       linha) as etiquetas continuam nas colunas 1, 2, ... da bobina; se
+       fossem centralizadas, cairiam sobre o vão entre as etiquetas. */
     .linha {
+      position: relative;
+      left: var(--ajuste-x);
+      top: var(--ajuste-y);
       display: flex;
       align-items: flex-start;
+      gap: var(--etiqueta-espaco-coluna);
       break-inside: avoid;
       page-break-inside: avoid;
     }
@@ -77,15 +102,11 @@
       justify-content: center;
       width: var(--etiqueta-largura);
       height: var(--etiqueta-altura);
-      padding: 0.6mm 0.6mm 0.8mm;
-      margin: 0 var(--etiqueta-espaco-coluna) var(--etiqueta-espaco-linha) 0;
+      padding: 0.8mm;
+      margin: 0;
       overflow: hidden;
       background: #fff;
-    }
-
-    /* A última etiqueta da linha encosta na margem direita. */
-    .linha .etiqueta:nth-child(3) {
-      margin-right: 0;
+      text-align: center;
     }
 
     .etiqueta svg.barras {
@@ -173,9 +194,19 @@
     .campo {
       display: inline-flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 6px;
       font-size: 13px;
       color: #333;
+    }
+
+    /* Ajuste fino da impressão: fica entre os botões e as dicas. */
+    .ajuste {
+      margin-bottom: 12px;
+    }
+
+    .ajuste input {
+      width: 70px;
     }
 
     .campo input {
@@ -314,15 +345,25 @@
       @endif
     </div>
 
+    <div class="campo ajuste">
+      <label for="ajuste-x">Ajuste fino da impressão</label>
+      <input type="number" id="ajuste-x" step="0.5" min="-5" max="5" value="1" />
+      <span>mm na horizontal</span>
+      <input type="number" id="ajuste-y" step="0.5" min="-5" max="5" value="0" />
+      <span>mm na vertical</span>
+      <button type="button" class="btn" id="ajuste-zerar">Zerar</button>
+    </div>
+
     <div class="dicas">
       1. Na janela de impressão, escolha a impressora de etiquetas.<br />
       2. Papel/tamanho: largura <strong>100mm</strong> e comprimento <strong>17mm</strong> (15mm da etiqueta + 2mm do vão entre as linhas) — uma linha de etiquetas por página; cadastre como papel personalizado no driver se ele pedir.<br />
-      3. <strong>Orientação: retrato</strong> (portrait). Margens: <strong>nenhuma</strong>. Escala: <strong>100%</strong> (nunca "ajustar à página").<br />
+      3. <strong>Orientação: paisagem</strong> (landscape) — a tela já abre assim, não precisa trocar. Margens: <strong>nenhuma</strong>. Escala: <strong>100%</strong> (nunca "ajustar à página").<br />
       4. Desmarque "cabeçalhos e rodapés" e desative o modo econômico/densidade baixa do driver.<br />
       5. <strong>No driver</strong>, o tipo de mídia deve ser <strong>etiqueta picotada com sensor de vão (gap)</strong> e o comprimento da etiqueta <strong>17mm</strong>. Se ficar em 18mm (o valor antigo) ou em "contínuo", a impressora avança mais do que a etiqueta e o erro cresce a cada linha.<br />
-      6. A orientação (retrato/paisagem) que faz a etiqueta sair certa deve ser <strong>salva como padrão no driver</strong> (Preferências de impressão), para não precisar trocá-la a cada impressão. Se o conteúdo sai girado 90°, ou o papel está cadastrado com largura e comprimento invertidos (o correto é <strong>largura 100mm × comprimento 17mm</strong>), ou a orientação do driver não bate com esse cadastro.<br />
-      7. Calibre/sensione a bobina na impressora (tecla de feed até ela achar o vão) antes do primeiro trabalho do dia.<br />
-      8. Para conferir o alinhamento, reimprima umas <strong>30 etiquetas</strong> de um mesmo item (campo "Reimprimir"): se a última continuar caindo dentro da etiqueta, o passo do driver está certo; se o desenho for escorregando para fora, o comprimento da etiqueta no driver ainda não é 17mm.
+      6. Deixe o papel da bobina (100mm × 17mm) como <strong>papel padrão</strong> da impressora: é ele que define o comprimento de cada página. Se o conteúdo sair girado 90°, o papel está cadastrado com largura e comprimento invertidos.<br />
+      7. Se o conteúdo sair deslocado dentro da etiqueta, use o <strong>Ajuste fino</strong> acima — ele já vem com <strong>1mm na horizontal</strong> (para compensar a margem não imprimível à esquerda): "horizontal" move para a direita e "vertical" para baixo (valores negativos movem para a esquerda/cima). O valor fica salvo neste computador.<br />
+      8. Calibre/sensione a bobina na impressora (tecla de feed até ela achar o vão) antes do primeiro trabalho do dia.<br />
+      9. Para conferir o alinhamento, reimprima umas <strong>30 etiquetas</strong> de um mesmo item (campo "Reimprimir"): se a última continuar caindo dentro da etiqueta, o passo do driver está certo; se o desenho for escorregando para fora, o comprimento da etiqueta no driver ainda não é 17mm.
     </div>
   </div>
 
@@ -345,5 +386,51 @@
       <p class="no-print">Nenhum código de barras para imprimir nesta entrada.</p>
     @endforelse
   </div>
+
+  <script>
+    (function () {
+      var CHAVE = 'estoque.etiquetas.ajuste';
+      var PADRAO_X = 1; // mesmo padrão do --ajuste-x do CSS
+      var PADRAO_Y = 0;
+      var raiz = document.documentElement;
+      var campoX = document.getElementById('ajuste-x');
+      var campoY = document.getElementById('ajuste-y');
+
+      function aplicar(x, y) {
+        raiz.style.setProperty('--ajuste-x', x + 'mm');
+        raiz.style.setProperty('--ajuste-y', y + 'mm');
+        campoX.value = x;
+        campoY.value = y;
+        try {
+          localStorage.setItem(CHAVE, JSON.stringify({ x: x, y: y }));
+        } catch (e) {}
+      }
+
+      function ler(campo) {
+        var valor = parseFloat(String(campo.value).replace(',', '.'));
+        if (isNaN(valor)) {
+          return 0;
+        }
+        return Math.max(-5, Math.min(5, valor));
+      }
+
+      var salvo = null;
+      try {
+        salvo = JSON.parse(localStorage.getItem(CHAVE) || 'null');
+      } catch (e) {}
+
+      aplicar(salvo ? Number(salvo.x) || 0 : PADRAO_X, salvo ? Number(salvo.y) || 0 : PADRAO_Y);
+
+      [campoX, campoY].forEach(function (campo) {
+        campo.addEventListener('change', function () {
+          aplicar(ler(campoX), ler(campoY));
+        });
+      });
+
+      document.getElementById('ajuste-zerar').addEventListener('click', function () {
+        aplicar(0, 0);
+      });
+    })();
+  </script>
 </body>
 </html>
