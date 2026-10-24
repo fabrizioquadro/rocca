@@ -11,9 +11,9 @@ use App\Http\Controllers\EstoqueBaixaController;
 use App\Http\Controllers\EstoqueBaixaVasilhameController;
 use App\Http\Controllers\EstoqueBuscaController;
 use App\Http\Controllers\EstoqueEntradaController;
-use App\Http\Controllers\EstoqueEtiquetaController;
 use App\Http\Controllers\EstoqueSaldoController;
 use App\Http\Controllers\EstoqueTransferenciaController;
+use App\Http\Controllers\EtiquetaImpressaoController;
 use App\Http\Controllers\FinanceiroController;
 use App\Http\Controllers\FinanceiroPagamentoController;
 use App\Http\Controllers\FornecedorController;
@@ -144,9 +144,13 @@ Route::middleware('auth')->group(function () {
         Route::get('/entradas/{entrada}', [EstoqueEntradaController::class, 'show'])->name('entradas.show');
         Route::delete('/entradas/{entrada}', [EstoqueEntradaController::class, 'destroy'])->name('entradas.destroy');
 
-        // Etiquetas (código de barras) da entrada — bobina 100mm, 3 etiquetas de 30x15mm por linha
-        Route::get('/entradas/{entrada}/etiquetas', [EstoqueEtiquetaController::class, 'entrada'])->name('entradas.etiquetas');
-        Route::get('/entradas/{entrada}/itens/{entrada_item}/etiquetas', [EstoqueEtiquetaController::class, 'item'])->name('entradas.itens.etiquetas');
+        // Etiquetas (código de barras) — página do tamanho exato da bobina:
+        // 100mm de largura por 17mm de altura, uma linha de 3 etiquetas por página
+        Route::get('/entradas/{entrada}/etiquetas', [EtiquetaImpressaoController::class, 'entrada'])->name('entradas.etiquetas');
+        Route::get('/entradas/{entrada}/itens/{entrada_item}/etiquetas', [EtiquetaImpressaoController::class, 'item'])->name('entradas.itens.etiquetas');
+
+        // Teste de alinhamento da impressora (gasta uma linha de etiquetas por linha)
+        Route::get('/etiquetas/teste', [EtiquetaImpressaoController::class, 'teste'])->name('etiquetas.teste');
 
         // Anexos da entrada (nota fiscal, recibo e etc.)
         Route::post('/entradas/{entrada}/anexos', [EstoqueEntradaController::class, 'storeAnexo'])->name('entradas.anexos.store');

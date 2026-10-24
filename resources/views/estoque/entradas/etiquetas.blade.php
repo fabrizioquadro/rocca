@@ -1,3 +1,5 @@
+{{-- OBSOLETO: a impressão de etiquetas agora é resources/views/estoque/etiquetas.blade.php,
+     com o tamanho exato da bobina (100mm x 17mm) em vez de @page size: landscape. --}}
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>

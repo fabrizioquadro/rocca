@@ -10,6 +10,11 @@ use Illuminate\Http\Request;
 /**
  * Impressão das etiquetas (código de barras) das entradas de estoque.
  *
+ * OBSOLETO: substituído por App\Http\Controllers\EtiquetaImpressaoController
+ * (resources/views/estoque/etiquetas.blade.php), que usa o tamanho exato da
+ * bobina em vez de "landscape". Nenhuma rota aponta para cá — pode apagar
+ * este arquivo e a view resources/views/estoque/entradas/etiquetas.blade.php.
+ *
  * A bobina tem 100mm de largura com 3 etiquetas de 30x15mm por linha: a tela
  * de impressão é montada nessa medida (ver resources/views/estoque/entradas/etiquetas.blade.php).
  */
