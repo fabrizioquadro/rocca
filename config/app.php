@@ -64,13 +64,16 @@ return [
     | Application Timezone
     |--------------------------------------------------------------------------
     |
-    | Here you may specify the default timezone for your application, which
-    | will be used by the PHP date and date-time functions. We have gone
-    | ahead and set this to a sensible default for you out of the box.
+    | Fuso da clínica (America/Sao_Paulo, UTC-3). Todas as datas e horas
+    | gravadas e exibidas pelo sistema usam este fuso. Pode ser trocado pelo
+    | APP_TIMEZONE do .env, sem mexer no código.
+    |
+    | Atenção: os registros gravados antes desta mudança estão em UTC e vão
+    | aparecer 3 horas mais cedo que o horário real da clínica.
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'America/Sao_Paulo'),
 
     /*
     |--------------------------------------------------------------------------
