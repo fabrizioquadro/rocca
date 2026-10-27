@@ -184,6 +184,48 @@ class PrescricaoFiscalTest extends TestCase
         });
     }
 
+    public function test_mostra_o_valor_da_prescricao_e_o_que_ja_foi_emitido_em_notas(): void
+    {
+        $usuario = $this->usuario();
+
+        // Uma prescrição sem notas: o teste controla o que aparece na aba.
+        $prescricao = Prescricao::query()
+            ->whereNotNull('paciente_id')
+            ->whereDoesntHave('notasFiscais')
+            ->first();
+
+        if (! $usuario || ! $prescricao) {
+            $this->markTestSkipped('Sem usuário ou prescrição sem nota para o teste.');
+        }
+
+        $prescricao->paciente->forceFill(['codigo_cliente_omie' => 123456])->save();
+
+        $nota = fn (int $numero, float $valor, string $status) => PrescricaoNotaFiscal::create([
+            'prescricao_id' => $prescricao->id,
+            'numero' => $numero,
+            'codigo_integracao' => $prescricao->id.'/'.$numero,
+            'n_cod_servico' => 10,
+            'quantidade' => 1,
+            'valor_unitario' => $valor,
+            'valor_total' => $valor,
+            'status' => $status,
+        ]);
+
+        $nota(1, 400.0, 'faturada');
+        $nota(2, 150.0, 'erro');
+
+        // Só a nota faturada conta: a que deu erro nunca saiu na Omie.
+        $this->assertSame(400.0, $prescricao->fresh()->valor_notas_emitidas);
+
+        $this->actingAs($usuario)
+            ->get(route('prescricoes.show', ['prescricao' => $prescricao, 'aba' => 'fiscal']))
+            ->assertOk()
+            ->assertSee('Valor da prescrição')
+            ->assertSee('Emitido em notas')
+            ->assertSee($prescricao->valor_cobrado_formatado)
+            ->assertSee('R$ 400,00');
+    }
+
     public function test_nao_emite_sem_servico_selecionado(): void
     {
         $usuario = $this->usuario();

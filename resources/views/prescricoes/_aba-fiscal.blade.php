@@ -2,6 +2,10 @@
 @php
   $pacienteOmie = $prescricao->paciente;
   $integradoOmie = (bool) $pacienteOmie?->codigo_cliente_omie;
+
+  // Só as notas faturadas entram no total: as que estão em processamento ou
+  // com erro não saíram na Omie.
+  $notasFaturadas = $prescricao->notasFiscais->where('status', 'faturada')->count();
 @endphp
 
 <div class="card mb-4" data-fiscal-paciente>
@@ -26,16 +30,35 @@
       @endif
     </div>
 
-    @unless ($integradoOmie)
-      <button
-        type="button"
-        class="btn btn-primary"
-        data-fiscal-integrar
-        data-url-feegow="{{ route('prescricoes.fiscal.paciente.feegow', $prescricao) }}"
-        data-url-omie="{{ route('prescricoes.fiscal.paciente.omie', $prescricao) }}">
-        <i class="ri-link me-1"></i>Integrar paciente
-      </button>
-    @endunless
+    <div class="d-flex flex-wrap align-items-center gap-4 ms-auto">
+      <div class="text-end">
+        <small class="text-muted d-block">Valor da prescrição</small>
+        <span class="fw-semibold fs-6">{{ $prescricao->valor_cobrado_formatado }}</span>
+      </div>
+
+      <div class="text-end">
+        <small class="text-muted d-block">
+          Emitido em notas
+          @if ($notasFaturadas > 0)
+            ({{ $notasFaturadas }})
+          @endif
+        </small>
+        <span class="fw-semibold fs-6 {{ $prescricao->valor_notas_emitidas > 0 ? 'text-success' : 'text-muted' }}">
+          {{ $prescricao->valor_notas_emitidas_formatado }}
+        </span>
+      </div>
+
+      @unless ($integradoOmie)
+        <button
+          type="button"
+          class="btn btn-primary"
+          data-fiscal-integrar
+          data-url-feegow="{{ route('prescricoes.fiscal.paciente.feegow', $prescricao) }}"
+          data-url-omie="{{ route('prescricoes.fiscal.paciente.omie', $prescricao) }}">
+          <i class="ri-link me-1"></i>Integrar paciente
+        </button>
+      @endunless
+    </div>
   </div>
 
   @unless ($integradoOmie)

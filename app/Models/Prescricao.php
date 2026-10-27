@@ -137,6 +137,42 @@ class Prescricao extends Model
     }
 
     /**
+     * Valor total cobrado na prescrição: o total do financeiro (já com
+     * desconto/adicional) ou, sem financeiro, a soma das semanas.
+     */
+    public function getValorCobradoAttribute(): float
+    {
+        return (float) ($this->financeiro?->valor_total ?? $this->valor_total);
+    }
+
+    /**
+     * Valor cobrado formatado (R$ 0,00).
+     */
+    public function getValorCobradoFormatadoAttribute(): string
+    {
+        return 'R$ '.number_format($this->valor_cobrado, 2, ',', '.');
+    }
+
+    /**
+     * Valor já faturado em notas fiscais. Só as notas faturadas contam:
+     * notas em processamento ou com erro não saíram na Omie.
+     */
+    public function getValorNotasEmitidasAttribute(): float
+    {
+        return (float) $this->notasFiscais
+            ->where('status', 'faturada')
+            ->sum(fn (PrescricaoNotaFiscal $nota) => (float) $nota->valor_total);
+    }
+
+    /**
+     * Valor das notas faturadas formatado (R$ 0,00).
+     */
+    public function getValorNotasEmitidasFormatadoAttribute(): string
+    {
+        return 'R$ '.number_format($this->valor_notas_emitidas, 2, ',', '.');
+    }
+
+    /**
      * Quantidade de semanas da prescrição.
      */
     public function getQuantidadeSemanasAttribute(): int

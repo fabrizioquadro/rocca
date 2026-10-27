@@ -637,6 +637,7 @@ class PrescricaoController extends Controller
             'semanas.parcelas',
             'financeiro.parcelas.semana',
             'financeiro.pagamentos.user',
+            'notasFiscais',
         ]);
 
         // Cada semana olha a prescrição para saber se pode ir para a fila
