@@ -191,8 +191,10 @@ Route::middleware('auth')->group(function () {
     // Pacientes (importados da Feegow)
     Route::get('/pacientes', [PacienteController::class, 'index'])->name('pacientes.index');
     Route::post('/pacientes/sincronizar', [PacienteController::class, 'sincronizar'])->name('pacientes.sincronizar');
+    Route::post('/pacientes/integrar-omie', [PacienteController::class, 'integrarOmieLote'])->name('pacientes.integrar-omie-lote');
     Route::get('/pacientes/{paciente}', [PacienteController::class, 'show'])->name('pacientes.show');
     Route::post('/pacientes/{paciente}/atualizar', [PacienteController::class, 'atualizarDados'])->name('pacientes.atualizar');
+    Route::post('/pacientes/{paciente}/integrar-omie', [PacienteController::class, 'integrarOmie'])->name('pacientes.integrar-omie');
 
     // Observação interna do paciente (não vem da Feegow)
     Route::put('/pacientes/{paciente}/observacao', [PacienteController::class, 'atualizarObservacao'])->name('pacientes.observacao.update');
