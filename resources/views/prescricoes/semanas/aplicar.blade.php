@@ -15,10 +15,21 @@
       <div class="d-flex flex-wrap align-items-center gap-3">
         <h4 class="fw-semibold mb-0">Registrar aplicação</h4>
         <span class="badge {{ $semana->status->corBadge() }}">{{ $semana->status->label() }}</span>
-        <span class="text-muted">
+        <div class="text-muted">
           Semana {{ $semana->numero }}/{{ $prescricao->quantidade_semanas }} ·
-          {{ $prescricao->paciente?->nome ?? '—' }}
-        </span>
+          <span class="fw-semibold text-body">{{ $prescricao->paciente?->nome ?? '—' }}</span>
+
+          @if ($prescricao->paciente?->nascimento)
+            · Nasc. {{ $prescricao->paciente->nascimento_formatado }}
+          @endif
+
+          {{-- Observação cadastrada no paciente: precisa aparecer para a enfermagem --}}
+          @if ($prescricao->paciente?->observacao)
+            <div class="text-warning small text-wrap" style="max-width: 420px;">
+              <i class="ri-alert-line"></i> {{ $prescricao->paciente->observacao }}
+            </div>
+          @endif
+        </div>
       </div>
 
       <div class="d-flex flex-wrap gap-2">
