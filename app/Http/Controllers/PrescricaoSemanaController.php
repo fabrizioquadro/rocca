@@ -384,6 +384,7 @@ class PrescricaoSemanaController extends Controller
 
         $semana->load(['itens.medicamento', 'itens.combo.itens.medicamento', 'itens.aplicacoes']);
         $atendimento->load(['aplicacoes.item', 'aplicacoes.entradaItem', 'aplicacoes.medicamento', 'aplicacoes.user', 'aplicacoes.vasilhameAberto']);
+        $prescricao->loadMissing(['anexos.user']);
 
         // Medicamentos por mg desta aplicação: são eles que podem abrir vasilhame
         $medicamentosMiligrama = $this->medicamentosMiligramaDaSemana($semana);

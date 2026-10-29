@@ -83,6 +83,39 @@
     @endif
   </div>
 
+  {{-- Anexos da prescrição (exames, receitas, documentos) para a enfermagem consultar --}}
+  <div class="card mb-4">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <h6 class="fw-semibold mb-0">Anexos da prescrição</h6>
+      <span class="text-muted small">{{ $prescricao->anexos->count() }} arquivo(s)</span>
+    </div>
+
+    <div class="card-body">
+      <ul class="list-group list-group-flush">
+        @forelse ($prescricao->anexos as $anexo)
+          <li class="list-group-item d-flex align-items-center gap-2 flex-wrap px-0">
+            <i class="{{ $anexo->eh_imagem ? 'ri-image-line' : 'ri-file-text-line' }} ri-20px"></i>
+
+            <a href="{{ $anexo->url }}" target="_blank" rel="noopener">{{ $anexo->nome }}</a>
+
+            <small class="text-muted">{{ $anexo->tamanho_formatado }}</small>
+            <small class="text-body-secondary">
+              {{ $anexo->criado_em_formatado }}{{ $anexo->user ? ' · '.$anexo->user->nome : '' }}
+            </small>
+
+            @if ($anexo->enviado_para_feegow)
+              <span class="badge bg-label-success" title="Anexo {{ $anexo->feegow_file_id }} no prontuário do paciente">
+                Feegow {{ $anexo->feegow_enviado_em_formatado }}
+              </span>
+            @endif
+          </li>
+        @empty
+          <li class="list-group-item text-muted px-0">Nenhum anexo na prescrição.</li>
+        @endforelse
+      </ul>
+    </div>
+  </div>
+
   @if ($atendimento->aplicacoes->isNotEmpty())
     <div class="card mb-4">
       <div class="card-header">
@@ -637,21 +670,127 @@
         return Number(normalizado) || 0;
       };
 
+      // Saldo devolvido pela API por código de barras. A API só conhece o que já
+      // foi gravado: o consumo das outras linhas desta aplicação (ainda não
+      // enviada) é descontado aqui, de cima para baixo, em cascata.
+      const saldosPorCodigo = new Map();
+
+      const chaveDoCodigo = (medicamentosPermitidos, codigo) => `${medicamentosPermitidos || ''}|${codigo}`;
+
+      const saldoDoCodigo = (medicamentosPermitidos, codigo) => {
+        const dados = saldosPorCodigo.get(chaveDoCodigo(medicamentosPermitidos, codigo));
+
+        return dados ? Number(dados.mg_restantes || 0) : null;
+      };
+
       const consultarCodigoDoVasilhame = async (medicamentosPermitidos, codigo) => {
+        const chave = chaveDoCodigo(medicamentosPermitidos, codigo);
+
+        if (saldosPorCodigo.has(chave)) {
+          return saldosPorCodigo.get(chave);
+        }
+
         const url = new URL(window.estoqueVasilhameUrl, window.location.origin);
         url.searchParams.set('codigo_barras', codigo);
         url.searchParams.set('clinica_id', window.aplicacaoClinicaId);
         url.searchParams.set('medicamento_ids', medicamentosPermitidos || '');
 
         const resposta = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        const dados = await resposta.json();
 
-        return resposta.json();
+        // Só guarda o que deu certo: vasilhame fechado pode ser aberto no modal
+        // e precisa ser consultado de novo.
+        if (dados?.ok) {
+          saldosPorCodigo.set(chave, dados);
+        }
+
+        return dados;
       };
 
-      const detalhesDoVasilhame = (dados) => `<span class="badge bg-label-success">Vasilhame aberto</span>`
+      // Quanto a linha consome de cada vasilhame, na mesma regra do servidor:
+      // com divisão explícita usa as quantidades informadas; sem divisão, o 1º
+      // vasilhame cobre o que der e o 2º completa o restante da dose.
+      const consumosDaLinha = (linha) => {
+        const consumos = [];
+
+        if (! linha.dataset.miligrama) return consumos;
+        if (linha.querySelector('[data-pendente]')?.checked) return consumos;
+
+        const codigo1 = linha.querySelector('[data-codigo-barras]')?.value.trim() || '';
+        const codigo2 = linha.querySelector('[data-codigo-barras-2]')?.value.trim() || '';
+
+        if (! codigo1 && ! codigo2) return consumos;
+
+        const necessario = Number(linha.dataset.necessario || 0);
+        const permitidos = linha.dataset.medicamentosPermitidos;
+        const mg1 = textoParaNumero(linha.querySelector('[data-quantidade-1]')?.value);
+        const mg2 = textoParaNumero(linha.querySelector('[data-quantidade-2]')?.value);
+
+        if (mg1 > 0) {
+          if (codigo1) consumos.push([codigo1, mg1]);
+          if (codigo2 && mg2 > 0) consumos.push([codigo2, mg2]);
+
+          return consumos;
+        }
+
+        let falta = necessario;
+
+        if (codigo1) {
+          const saldo1 = saldoDoCodigo(permitidos, codigo1);
+          const usa = arredondar(Math.max(saldo1 === null ? falta : Math.min(falta, saldo1), 0));
+
+          if (usa > 0) consumos.push([codigo1, usa]);
+
+          falta = arredondar(falta - usa);
+        }
+
+        if (falta > 0 && codigo2) {
+          consumos.push([codigo2, falta]);
+        }
+
+        return consumos;
+      };
+
+      // Quanto as linhas acima já consumiram deste código de barras.
+      const consumoAnterior = (codigo, linhaAtual) => {
+        let total = 0;
+
+        for (const outra of linhas) {
+          if (outra === linhaAtual) break;
+
+          consumosDaLinha(outra).forEach(([consumido, mg]) => {
+            if (consumido === codigo) total += mg;
+          });
+        }
+
+        return arredondar(total);
+      };
+
+      // Saldo que sobra para esta linha: o da API menos o das linhas de cima.
+      const saldoDisponivel = (dados, codigo, linha) => Math.max(
+        arredondar(Number(dados.mg_restantes || 0) - consumoAnterior(codigo, linha)),
+        0
+      );
+
+      // O que as linhas abaixo mostram depende do que as de cima consomem.
+      const reavaliarSeguintes = (linhaAtual) => {
+        let depois = false;
+
+        linhas.forEach((linha) => {
+          if (linha === linhaAtual) {
+            depois = true;
+
+            return;
+          }
+
+          if (depois && linha.dataset.miligrama) avaliarMiligrama(linha);
+        });
+      };
+
+      const detalhesDoVasilhame = (dados, mgRestantes = Number(dados.mg_restantes || 0)) => `<span class="badge bg-label-success">Vasilhame aberto</span>`
         + `<span class="d-block small text-body-secondary mt-1">lote ${dados.lote ?? '—'}`
         + ` · venc. ${dados.vencimento ?? '—'}`
-        + ` · restam <strong>${dados.mg_restantes_formatado}</strong></span>`;
+        + ` · restam <strong>${formatarMg(mgRestantes)} mg</strong></span>`;
 
       // Divisão confirmada no modal: o 2º input aparece e os dois ficam
       // travados — só abrindo o modal de novo para alterar
@@ -749,9 +888,9 @@
 
         linha.dataset.vasilhameId = primeiro.vasilhame_id;
 
-        const restante1 = Number(primeiro.mg_restantes || 0);
+        const restante1 = saldoDisponivel(primeiro, codigo1, linha);
 
-        let html = detalhesDoVasilhame(primeiro);
+        let html = detalhesDoVasilhame(primeiro, restante1);
 
         if (! codigo2) {
           if (restante1 < necessario) {
@@ -788,10 +927,11 @@
 
         linha.dataset.vasilhameIdSegundo = segundo.vasilhame_id;
 
-        const total = arredondar(restante1 + Number(segundo.mg_restantes || 0));
+        const restante2 = saldoDisponivel(segundo, codigo2, linha);
+        const total = arredondar(restante1 + restante2);
 
         html += `<span class="d-block small text-body-secondary mt-1">2º: lote ${segundo.lote ?? '—'}`
-          + ` · restam ${segundo.mg_restantes_formatado}</span>`;
+          + ` · restam ${formatarMg(restante2)} mg</span>`;
 
         if (total < necessario) {
           html += '<span class="d-block small text-danger mt-1">Os vasilhames não têm a quantidade necessária:'
@@ -911,12 +1051,16 @@
 
         alternarCampos(linha);
 
-        campoPendente.addEventListener('change', () => alternarCampos(linha));
+        campoPendente.addEventListener('change', () => {
+          alternarCampos(linha);
+
+          if (linha.dataset.miligrama) reavaliarSeguintes(linha);
+        });
 
         // Procedimento não tem campo de código de barras
         campoCodigo?.addEventListener('change', () => {
           if (linha.dataset.miligrama) {
-            avaliarMiligrama(linha);
+            avaliarMiligrama(linha).then(() => reavaliarSeguintes(linha));
           } else {
             consultarCodigo(linha);
           }
@@ -1074,13 +1218,16 @@
               return;
             }
 
-            vasilhames[numero] = dados;
+            // Desconta o que as linhas de cima já usam deste vasilhame
+            const disponivel = saldoDisponivel(dados, codigo, linha);
 
-            info.innerHTML = detalhesDoVasilhame(dados);
+            vasilhames[numero] = { ...dados, mg_restantes: disponivel };
+
+            info.innerHTML = detalhesDoVasilhame(dados, disponivel);
 
             // Sugere a quantidade de cada vasilhame (não mexe no que foi digitado)
             if (numero === 1 && ! quantidade1.dataset.manual) {
-              quantidade1.value = formatarMg(Math.min(Number(dados.mg_restantes || 0), necessario));
+              quantidade1.value = formatarMg(Math.min(disponivel, necessario));
             }
 
             if (numero === 2 && ! quantidade2.dataset.manual) {
@@ -1153,6 +1300,7 @@
 
           travarDivisao(linha);
           mostrarDivisaoDaLinha(linha);
+          reavaliarSeguintes(linha);
 
           bootstrap.Modal.getInstance(modal)?.hide();
         });
@@ -1175,7 +1323,7 @@
           vasilhames[2] = null;
 
           travarDivisao(linha);
-          avaliarMiligrama(linha);
+          avaliarMiligrama(linha).then(() => reavaliarSeguintes(linha));
           atualizarResumo();
 
           bootstrap.Modal.getInstance(modal)?.hide();
