@@ -79,8 +79,9 @@
                 </td>
                 <td>{{ $prescricao?->medico_nome ?? '—' }}</td>
                 <td>{{ $prescricao?->tipo_atendimento?->label() ?? '—' }}</td>
-                {{-- Mesmo tipo do Atendimento: é o que define a nota (tratamento x consulta) --}}
-                <td>{{ $prescricao?->tipo_atendimento?->label() ?? '—' }}</td>
+                {{-- Consulta x Tratamento pela composição da prescrição: só o
+                     medicamento Consulta é consulta; qualquer outro item é tratamento --}}
+                <td>{{ $prescricao?->classificacao ?? '—' }}</td>
                 <td>{{ $pagamento->financeiro?->clinica?->nome ?? '—' }}</td>
                 <td>{{ $pagamento->forma_descricao }}</td>
                 <td class="small text-body-secondary">{{ $pagamento->identificador_label }}</td>

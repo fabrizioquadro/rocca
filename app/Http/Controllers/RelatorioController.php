@@ -461,7 +461,14 @@ class RelatorioController extends Controller
             ->values();
 
         $pagamentos = $base()
-            ->with(['user', 'financeiro.clinica', 'financeiro.prescricao.paciente'])
+            ->with([
+                'user',
+                'financeiro.clinica',
+                'financeiro.prescricao.paciente',
+                // Classificação da coluna Procedimento (Consulta x Tratamento)
+                'financeiro.prescricao.semanas:id,prescricao_id',
+                'financeiro.prescricao.semanas.itens:id,prescricao_semana_id,medicamento_id',
+            ])
             ->when($medico !== '', fn ($query) => $query->whereHas(
                 'financeiro.prescricao',
                 fn ($prescricao) => $prescricao->where('medico_nome', $medico)

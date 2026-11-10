@@ -314,6 +314,24 @@ class Prescricao extends Model
     }
 
     /**
+     * Classificação da prescrição: "Consulta" quando ela tem somente o
+     * medicamento Consulta; qualquer outro item (medicamento ou combo) faz dela
+     * um "Tratamento". Sem itens não há como classificar.
+     */
+    public function getClassificacaoAttribute(): ?string
+    {
+        $itens = $this->semanas->flatMap->itens;
+
+        if ($itens->isEmpty()) {
+            return null;
+        }
+
+        return $itens->every(
+            fn (PrescricaoSemanaItem $item) => (int) $item->medicamento_id === Medicamento::CONSULTA_ID
+        ) ? 'Consulta' : 'Tratamento';
+    }
+
+    /**
      * A prescrição está em aberto? Sim enquanto houver semana com aplicação
      * ainda pendente (agendada, na fila, em atendimento ou em andamento).
      *

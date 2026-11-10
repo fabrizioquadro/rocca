@@ -14,6 +14,12 @@ class Medicamento extends Model
     use HasFactory, SoftDeletes;
 
     /**
+     * Medicamento "Consulta": a prescrição que tem somente ele é classificada
+     * como Consulta (e não Tratamento) nos relatórios.
+     */
+    public const CONSULTA_ID = 10004;
+
+    /**
      * Nome da tabela.
      *
      * @var string
