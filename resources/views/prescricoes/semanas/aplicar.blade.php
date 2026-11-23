@@ -128,6 +128,7 @@
             <thead class="table-light">
               <tr>
                 <th>Medicamento</th>
+                <th style="width: 150px;">Entregue ao paciente</th>
                 <th style="width: 120px;">Quantidade</th>
                 <th style="width: 150px;">Aplicado em</th>
                 <th style="width: 130px;">Código de barras</th>
@@ -139,6 +140,7 @@
               @foreach ($atendimento->aplicacoes as $aplicacao)
                 <tr>
                   <td>{{ $aplicacao->medicamento?->nome ?? $aplicacao->item?->nome ?? '—' }}</td>
+                  <td>{{ $aplicacao->entregue_ao_paciente ? 'Sim' : 'Não' }}</td>
                   <td>{{ $aplicacao->quantidade_com_unidade }}</td>
                   <td>{{ $aplicacao->aplicado_em_formatado }}</td>
                   <td>{{ $aplicacao->codigo_barras ?? '—' }}</td>
@@ -170,6 +172,17 @@
       </div>
 
       <div class="card-body">
+        <div class="form-check mb-3">
+          <input
+            type="checkbox"
+            class="form-check-input"
+            id="entregue-ao-paciente"
+            name="entregue_ao_paciente"
+            value="1"
+            @checked(old('entregue_ao_paciente')) />
+          <label class="form-check-label" for="entregue-ao-paciente">Medicamentos entregues ao paciente</label>
+        </div>
+
         <div class="table-responsive">
           <table class="table table-sm table-bordered align-middle mb-0">
             <thead class="table-light">

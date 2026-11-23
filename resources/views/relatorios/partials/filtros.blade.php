@@ -2,7 +2,7 @@
   Filtros padrão dos relatórios.
   Variáveis: $rota (obrigatória), $comPeriodo, $comClinica, $comMedicamento,
   $comTipo, $comVencidas, $comMedico, $comFormaPagamento, $comAtendimento,
-  $comPaciente, $rotuloPeriodo.
+  $comPaciente, $comSemana, $rotuloPeriodo.
 --}}
 <form method="GET" action="{{ $rota }}" class="relatorio-filtros row g-3 align-items-end">
   @if ($comPeriodo ?? true)
@@ -39,6 +39,20 @@
         @foreach ($medicamentos as $medicamento)
           <option value="{{ $medicamento->id }}" @selected((int) request('medicamento_id') === $medicamento->id)>
             {{ $medicamento->nome }}
+          </option>
+        @endforeach
+      </select>
+    </div>
+  @endif
+
+  @if ($comSemana ?? false)
+    <div class="col-md-2">
+      <label class="form-label" for="semana">Semana de aplicação</label>
+      <select id="semana" name="semana" class="form-select">
+        <option value="">Todas as semanas</option>
+        @foreach ($semanas as $numeroSemana)
+          <option value="{{ $numeroSemana }}" @selected((int) request('semana') === (int) $numeroSemana)>
+            Semana {{ $numeroSemana }}
           </option>
         @endforeach
       </select>

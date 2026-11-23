@@ -169,13 +169,14 @@
         <table class="imp-tabela">
           <thead>
             <tr>
-              <th style="width: 13%;">Aplicado em</th>
-              <th style="width: 24%;">Medicamento aplicado</th>
-              <th style="width: 10%;" class="imp-centro">Quantidade</th>
-              <th style="width: 13%;">Lote</th>
-              <th style="width: 12%;">Código de barras</th>
-              <th style="width: 11%;">Vencimento</th>
-              <th style="width: 17%;">Quem aplicou</th>
+              <th style="width: 11%;">Aplicado em</th>
+              <th style="width: 21%;">Medicamento aplicado</th>
+              <th style="width: 9%;" class="imp-centro">Quantidade</th>
+              <th style="width: 10%;">Entregue ao paciente</th>
+              <th style="width: 11%;">Lote</th>
+              <th style="width: 11%;">Código de barras</th>
+              <th style="width: 9%;">Vencimento</th>
+              <th style="width: 18%;">Quem aplicou</th>
             </tr>
           </thead>
           <tbody>
@@ -193,6 +194,7 @@
                 <td class="imp-centro">
                   {{ $aplicacao->quantidade === null ? '—' : $aplicacao->quantidade_com_unidade }}
                 </td>
+                <td>{{ $aplicacao->entregue_ao_paciente ? 'Sim' : 'Não' }}</td>
                 <td>{{ $rotulo($aplicacao->lote) }}</td>
                 <td>{{ $rotulo($aplicacao->codigo_barras) }}</td>
                 <td>{{ $rotulo($aplicacao->vencimento_formatado) }}</td>

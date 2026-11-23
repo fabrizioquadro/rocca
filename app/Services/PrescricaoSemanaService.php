@@ -380,6 +380,7 @@ class PrescricaoSemanaService
 
         $clinicaId = (int) $semana->prescricao->clinica_id;
         $informados = $dados['itens'] ?? [];
+        $aplicacoesExistentes = $atendimento->aplicacoes()->pluck('id');
 
         // Só os itens que ainda não foram aplicados precisam ser decididos.
         // A "praxe" é marcar todos: aplicado ou pendente.
@@ -406,6 +407,14 @@ class PrescricaoSemanaService
         foreach ($aMarcar as $item) {
             $this->registrarItemDoAtendimento($atendimento, $semana, $item, $informados[$item->id] ?? [], $clinicaId);
         }
+
+        $novasAplicacoes = $atendimento->aplicacoes();
+        if ($aplicacoesExistentes->isNotEmpty()) {
+            $novasAplicacoes->whereNotIn('id', $aplicacoesExistentes);
+        }
+        $novasAplicacoes->update([
+            'entregue_ao_paciente' => filter_var($dados['entregue_ao_paciente'] ?? false, FILTER_VALIDATE_BOOLEAN),
+        ]);
 
         $atendimento->update([
             'finalizado_em' => now(),

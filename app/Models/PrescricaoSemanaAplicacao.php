@@ -38,6 +38,7 @@ class PrescricaoSemanaAplicacao extends Model
         'aplicado_em',
         'user_id',
         'observacao',
+        'entregue_ao_paciente',
     ];
 
     /**
@@ -49,6 +50,7 @@ class PrescricaoSemanaAplicacao extends Model
         'vencimento' => 'date',
         'aplicado_em' => 'datetime',
         'quantidade' => 'decimal:3',
+        'entregue_ao_paciente' => 'boolean',
     ];
 
     /**

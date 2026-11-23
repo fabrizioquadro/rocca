@@ -667,6 +667,7 @@
                     <th style="width: 140px;">Aplicado em</th>
                     <th style="min-width: 190px;">Medicamento aplicado</th>
                     <th style="width: 110px;" class="text-center">Quantidade</th>
+                    <th style="width: 150px;">Entregue ao paciente</th>
                     <th style="width: 130px;">Lote</th>
                     <th style="width: 130px;">Código de barras</th>
                     <th style="width: 110px;">Vencimento</th>
@@ -689,6 +690,7 @@
                       <td class="text-center">
                         {{ $aplicacao->quantidade === null ? '—' : $aplicacao->quantidade_com_unidade }}
                       </td>
+                      <td>{{ $aplicacao->entregue_ao_paciente ? 'Sim' : 'Não' }}</td>
                       <td>{{ $aplicacao->lote ?? '—' }}</td>
                       <td class="font-monospace">{{ $aplicacao->codigo_barras ?? '—' }}</td>
                       <td>

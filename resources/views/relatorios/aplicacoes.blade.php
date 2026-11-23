@@ -19,6 +19,7 @@
       @include('relatorios.partials.filtros', [
         'rota' => route('relatorios.aplicacoes'),
         'comMedicamento' => true,
+        'comSemana' => true,
       ])
     </x-slot:filtros>
 

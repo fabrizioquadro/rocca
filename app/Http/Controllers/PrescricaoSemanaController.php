@@ -517,6 +517,7 @@ class PrescricaoSemanaController extends Controller
 
         $dados = $request->validate([
             'observacao' => ['nullable', 'string', 'max:2000'],
+            'entregue_ao_paciente' => ['nullable', 'boolean'],
 
             'itens' => ['required', 'array'],
             // A tela manda um checkbox "Pendente" por item: marcado = não

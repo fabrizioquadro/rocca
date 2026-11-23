@@ -16,6 +16,7 @@ use App\Models\FinanceiroParcela;
 use App\Models\Medicamento;
 use App\Models\Paciente;
 use App\Models\Prescricao;
+use App\Models\PrescricaoSemana;
 use App\Models\PrescricaoSemanaAplicacao;
 use App\Models\PrescricaoSemanaItem;
 use App\Models\VasilhameAberto;
@@ -182,7 +183,12 @@ class RelatorioController extends Controller
 
         return view('relatorios.aplicacoes', array_merge(
             $this->dadosComuns($request),
-            compact('aplicacoes', 'totalMg', 'totalUnidades')
+            [
+                'aplicacoes' => $aplicacoes,
+                'totalMg' => $totalMg,
+                'totalUnidades' => $totalUnidades,
+                'semanas' => PrescricaoSemana::query()->distinct()->orderBy('numero')->pluck('numero'),
+            ]
         ));
     }
 
@@ -541,6 +547,9 @@ class RelatorioController extends Controller
         [$inicio, $fim] = $this->periodo($request);
         $clinicaId = (int) $request->input('clinica_id');
         $medicamentoId = (int) $request->input('medicamento_id');
+        $semanaNumero = $request->validate([
+            'semana' => ['nullable', 'integer', 'min:1'],
+        ])['semana'] ?? null;
 
         return PrescricaoSemanaAplicacao::query()
             ->with(['medicamento', 'user', 'item.semana.prescricao.paciente', 'item.semana.prescricao.clinica'])
@@ -550,6 +559,10 @@ class RelatorioController extends Controller
                 fn ($prescricao) => $prescricao->where('clinica_id', $clinicaId)
             ))
             ->when($medicamentoId, fn ($query) => $query->where('medicamento_id', $medicamentoId))
+            ->when($semanaNumero, fn ($query) => $query->whereHas(
+                'item.semana',
+                fn ($semana) => $semana->where('numero', $semanaNumero)
+            ))
             ->orderBy('aplicado_em')
             ->get();
     }

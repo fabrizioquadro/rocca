@@ -457,6 +457,7 @@
                 <th style="width: 145px;">Chegada</th>
                 <th style="width: 145px;">Atendimento</th>
                 <th style="width: 145px;">Aplicação</th>
+                <th style="width: 150px;">Entregue ao paciente</th>
                 <th style="min-width: 165px;">Quem aplicou</th>
                 <th style="width: 130px;">Código de barras</th>
                 <th style="width: 100px;">Lote</th>
@@ -517,6 +518,7 @@
                   <td>{{ $juntar($aplicacoesDoItem, fn ($linha) => $linha['atendimento']->chegada_em_formatada) ?: '—' }}</td>
                   <td>{{ $juntar($aplicacoesDoItem, fn ($linha) => $linha['atendimento']->iniciado_em_formatado) ?: '—' }}</td>
                   <td>{{ $juntar($aplicacoesDoItem, fn ($linha) => $linha['aplicacao']->aplicado_em_formatado) ?: '—' }}</td>
+                  <td>{{ $juntar($aplicacoesDoItem, fn ($linha) => $linha['aplicacao']->entregue_ao_paciente ? 'Sim' : 'Não') ?: '—' }}</td>
                   <td>{{ $juntar($aplicacoesDoItem, fn ($linha) => $linha['aplicacao']->user?->nome) ?: '—' }}</td>
                   <td class="font-monospace">{{ $juntar($aplicacoesDoItem, fn ($linha) => $linha['aplicacao']->codigo_barras) ?: '—' }}</td>
                   <td>{{ $juntar($aplicacoesDoItem, fn ($linha) => $linha['aplicacao']->lote) ?: '—' }}</td>
@@ -528,7 +530,7 @@
               <tr>
                 <th colspan="3" class="text-end">Total da semana</th>
                 <th class="text-end">{{ $semana->valor_total_formatado }}</th>
-                <th colspan="8"></th>
+                <th colspan="9"></th>
               </tr>
             </tfoot>
           </table>
