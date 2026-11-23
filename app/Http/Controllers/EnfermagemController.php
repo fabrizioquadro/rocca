@@ -6,6 +6,7 @@ use App\Enums\StatusSemana;
 use App\Models\PrescricaoSemana;
 use App\Models\PrescricaoSemanaAplicacao;
 use App\Models\PrescricaoSemanaAtendimento;
+use Illuminate\Support\Collection;
 
 /**
  * Área da Enfermagem.
@@ -57,22 +58,41 @@ class EnfermagemController extends Controller
             ->orderBy('iniciado_em')
             ->get();
 
-        // Quantitativo do DIA por usuário: quantas aplicações cada um registrou.
-        // Mg (vasilhame aberto) e unidades (ampola/combo) ficam separados, porque
-        // são grandezas diferentes.
-        $aplicacoesPorUsuario = PrescricaoSemanaAplicacao::with('user')
+        // Quantitativo do DIA por usuário: quantos PACIENTES cada um atendeu.
+        // Cada aplicação leva ao atendimento, que leva à semana e à prescrição
+        // (onde está o paciente) — o mesmo paciente pode ter várias aplicações.
+        $aplicacoesDoDia = PrescricaoSemanaAplicacao::with([
+            'user',
+            'atendimento.semana.prescricao:id,paciente_id',
+        ])
             ->whereDate('aplicado_em', now()->toDateString())
-            ->get()
+            ->get();
+
+        $pacientesPorUsuario = $aplicacoesDoDia
             ->groupBy('user_id')
             ->map(fn ($aplicacoes) => [
                 'usuario' => $aplicacoes->first()->user?->nome ?? 'Usuário removido',
-                'aplicacoes' => $aplicacoes->count(),
-                'unidades' => round((float) $aplicacoes->whereNull('vasilhame_aberto_id')->sum('quantidade'), 3),
-                'mg' => round((float) $aplicacoes->whereNotNull('vasilhame_aberto_id')->sum('quantidade'), 2),
+                'pacientes' => $this->pacientesDistintos($aplicacoes),
             ])
-            ->sortByDesc('aplicacoes')
+            ->sortByDesc('pacientes')
             ->values();
 
-        return view('enfermagem.index', compact('fila', 'atendimentos', 'aplicacoesPorUsuario'));
+        // Total do dia é o distinto geral: o mesmo paciente pode ter sido
+        // atendido por mais de um usuário.
+        $totalPacientes = $this->pacientesDistintos($aplicacoesDoDia);
+
+        return view('enfermagem.index', compact('fila', 'atendimentos', 'pacientesPorUsuario', 'totalPacientes'));
+    }
+
+    /**
+     * Pacientes distintos de um conjunto de aplicações.
+     */
+    private function pacientesDistintos(Collection $aplicacoes): int
+    {
+        return $aplicacoes
+            ->map(fn (PrescricaoSemanaAplicacao $aplicacao) => $aplicacao->atendimento?->semana?->prescricao?->paciente_id)
+            ->filter()
+            ->unique()
+            ->count();
     }
 }

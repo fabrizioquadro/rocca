@@ -311,18 +311,17 @@
     </div>
   </div>
 
-  {{-- Quantitativo do dia: aplicações registradas por usuário --}}
+  {{-- Quantitativo do dia: pacientes atendidos por usuário --}}
   <div class="card mt-6">
     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
       <div class="d-flex flex-wrap align-items-center gap-2">
         <i class="ri-user-star-line ri-24px text-info"></i>
-        <h4 class="fw-semibold mb-0">Aplicações por usuário</h4>
-        <span class="badge bg-label-info">{{ $aplicacoesPorUsuario->count() }}</span>
+        <h4 class="fw-semibold mb-0">Pacientes atendidos por usuário</h4>
+        <span class="badge bg-label-info">{{ $pacientesPorUsuario->count() }}</span>
       </div>
 
       <span class="text-muted small">
-        {{ now()->format('d/m/Y') }} — quantas aplicações cada usuário registrou hoje
-        (mg dos vasilhames e unidades separados)
+        {{ now()->format('d/m/Y') }} — quantos pacientes cada usuário atendeu hoje
       </span>
     </div>
 
@@ -332,31 +331,21 @@
           <thead class="table-light">
             <tr>
               <th>Usuário</th>
-              <th class="text-center" style="width: 130px;">Aplicações</th>
-              <th class="text-center" style="width: 130px;">Unidades</th>
-              <th class="text-center" style="width: 130px;">mg</th>
+              <th class="text-center" style="width: 130px;">Pacientes</th>
             </tr>
           </thead>
           <tbody>
-            @foreach ($aplicacoesPorUsuario as $linha)
+            @foreach ($pacientesPorUsuario as $linha)
               <tr>
                 <td>{{ $linha['usuario'] }}</td>
-                <td class="text-center fw-semibold">{{ $linha['aplicacoes'] }}</td>
-                <td class="text-center">{{ $linha['unidades'] > 0 ? \App\Support\Numero::formatar($linha['unidades']) : '—' }}</td>
-                <td class="text-center">
-                  {{ $linha['mg'] > 0 ? \App\Support\Numero::formatar($linha['mg']) : '—' }}
-                </td>
+                <td class="text-center fw-semibold">{{ $linha['pacientes'] }}</td>
               </tr>
             @endforeach
           </tbody>
           <tfoot>
             <tr>
               <th class="text-end">Total</th>
-              <th class="text-center">{{ $aplicacoesPorUsuario->sum('aplicacoes') }}</th>
-              <th class="text-center">{{ \App\Support\Numero::formatar($aplicacoesPorUsuario->sum('unidades')) }}</th>
-              <th class="text-center">
-                {{ \App\Support\Numero::formatar($aplicacoesPorUsuario->sum('mg')) }}
-              </th>
+              <th class="text-center">{{ $totalPacientes }}</th>
             </tr>
           </tfoot>
         </table>
@@ -412,7 +401,7 @@
       $('#tabela-aplicacoes-usuario').DataTable(Object.assign({}, opcoes, {
         columnDefs: [],
         language: Object.assign({}, opcoes.language, {
-          emptyTable: 'Nenhuma aplicação registrada hoje.'
+          emptyTable: 'Nenhum paciente atendido hoje.'
         })
       }));
 
