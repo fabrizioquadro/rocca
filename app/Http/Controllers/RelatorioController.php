@@ -24,6 +24,7 @@ use App\Services\FinanceiroPagamentoService;
 use App\Services\RelatorioExportacaoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * Relatórios operacionais: estoque (inclusive vasilhames abertos), aplicações
@@ -188,6 +189,7 @@ class RelatorioController extends Controller
                 'totalMg' => $totalMg,
                 'totalUnidades' => $totalUnidades,
                 'semanas' => PrescricaoSemana::query()->distinct()->orderBy('numero')->pluck('numero'),
+                'medicos' => $this->medicos(),
             ]
         ));
     }
@@ -217,7 +219,8 @@ class RelatorioController extends Controller
 
         return view('relatorios.aplicacoes-por-medicamento', array_merge(
             $this->dadosComuns($request),
-            compact('linhas')
+            compact('linhas'),
+            ['medicos' => $this->medicos()]
         ));
     }
 
@@ -358,6 +361,7 @@ class RelatorioController extends Controller
         [$inicio, $fim] = $this->periodo($request);
         $clinicaId = (int) $request->input('clinica_id');
         $medicamentoId = (int) $request->input('medicamento_id');
+        $medico = trim((string) $request->input('medico'));
 
         $itens = PrescricaoSemanaItem::query()
             ->with(['medicamento', 'combo', 'semana.prescricao.paciente', 'semana.prescricao.clinica'])
@@ -371,13 +375,18 @@ class RelatorioController extends Controller
                     ));
             })
             ->when($medicamentoId, fn ($query) => $query->where('medicamento_id', $medicamentoId))
+            ->when($medico !== '', fn ($query) => $query->whereHas(
+                'semana.prescricao',
+                fn ($prescricao) => $prescricao->where('medico_nome', $medico)
+            ))
             ->get()
             ->sortBy(fn ($item) => $item->semana?->data_prevista)
             ->values();
 
         return view('relatorios.itens-pendentes', array_merge(
             $this->dadosComuns($request),
-            compact('itens')
+            compact('itens'),
+            ['medicos' => $this->medicos()]
         ));
     }
 
@@ -389,6 +398,7 @@ class RelatorioController extends Controller
         [$inicio, $fim] = $this->periodo($request);
         $clinicaId = (int) $request->input('clinica_id');
         $somenteVencidas = $request->boolean('vencidas');
+        $medico = trim((string) $request->input('medico'));
 
         $parcelas = FinanceiroParcela::query()
             ->with(['semana.prescricao.paciente', 'semana.prescricao.clinica', 'financeiro.parcelas', 'financeiro.pagamentos'])
@@ -397,6 +407,10 @@ class RelatorioController extends Controller
             ->when($clinicaId, fn ($query) => $query->whereHas(
                 'financeiro',
                 fn ($financeiro) => $financeiro->where('clinica_id', $clinicaId)
+            ))
+            ->when($medico !== '', fn ($query) => $query->whereHas(
+                'semana.prescricao',
+                fn ($prescricao) => $prescricao->where('medico_nome', $medico)
             ))
             ->when($somenteVencidas, fn ($query) => $query->vencidas())
             ->orderBy('vencimento')
@@ -431,7 +445,8 @@ class RelatorioController extends Controller
 
         return view('relatorios.contas-receber', array_merge(
             $this->dadosComuns($request),
-            compact('parcelas', 'totalAberto', 'totalVencido', 'somenteVencidas', 'idsPorParcela')
+            compact('parcelas', 'totalAberto', 'totalVencido', 'somenteVencidas', 'idsPorParcela'),
+            ['medicos' => $this->medicos()]
         ));
     }
 
@@ -448,8 +463,7 @@ class RelatorioController extends Controller
         $tipoAtendimento = (string) $request->input('tipo_atendimento');
         $pacienteId = (int) $request->input('paciente_id');
 
-        // Base do período/clínica: dela saem a lista de médicos do filtro e os
-        // totais do resumo
+        // Base do período/clínica: dela saem os totais do resumo
         $base = fn () => FinanceiroPagamento::query()
             ->whereBetween('data_pagamento', [$inicio->toDateString(), $fim->toDateString()])
             ->when($clinicaId, fn ($query) => $query->whereHas(
@@ -457,14 +471,7 @@ class RelatorioController extends Controller
                 fn ($financeiro) => $financeiro->where('clinica_id', $clinicaId)
             ));
 
-        $medicos = $base()
-            ->with('financeiro.prescricao:id,medico_nome')
-            ->get()
-            ->pluck('financeiro.prescricao.medico_nome')
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values();
+        $medicos = $this->medicos();
 
         $pagamentos = $base()
             ->with([
@@ -516,11 +523,13 @@ class RelatorioController extends Controller
     {
         [$inicio, $fim] = $this->periodo($request);
         $clinicaId = (int) $request->input('clinica_id');
+        $medico = trim((string) $request->input('medico'));
 
         $prescricoes = Prescricao::query()
             ->with(['paciente', 'clinica', 'financeiro.pagamentos'])
             ->whereBetween('created_at', [$inicio, $fim])
             ->when($clinicaId, fn ($query) => $query->where('clinica_id', $clinicaId))
+            ->when($medico !== '', fn ($query) => $query->where('medico_nome', $medico))
             ->orderByDesc('id')
             ->get();
 
@@ -535,7 +544,8 @@ class RelatorioController extends Controller
 
         return view('relatorios.prescricoes', array_merge(
             $this->dadosComuns($request),
-            compact('prescricoes', 'totais')
+            compact('prescricoes', 'totais'),
+            ['medicos' => $this->medicos()]
         ));
     }
 
@@ -547,6 +557,7 @@ class RelatorioController extends Controller
         [$inicio, $fim] = $this->periodo($request);
         $clinicaId = (int) $request->input('clinica_id');
         $medicamentoId = (int) $request->input('medicamento_id');
+        $medico = trim((string) $request->input('medico'));
         $semanaNumero = $request->validate([
             'semana' => ['nullable', 'integer', 'min:1'],
         ])['semana'] ?? null;
@@ -557,6 +568,10 @@ class RelatorioController extends Controller
             ->when($clinicaId, fn ($query) => $query->whereHas(
                 'item.semana.prescricao',
                 fn ($prescricao) => $prescricao->where('clinica_id', $clinicaId)
+            ))
+            ->when($medico !== '', fn ($query) => $query->whereHas(
+                'item.semana.prescricao',
+                fn ($prescricao) => $prescricao->where('medico_nome', $medico)
             ))
             ->when($medicamentoId, fn ($query) => $query->where('medicamento_id', $medicamentoId))
             ->when($semanaNumero, fn ($query) => $query->whereHas(
@@ -609,5 +624,23 @@ class RelatorioController extends Controller
             'medicamentos' => Medicamento::orderBy('nome')->get(),
             'tiposMovimentacao' => TipoMovimentacaoEstoque::opcoes(),
         ];
+    }
+
+    /**
+     * Nomes de médicos para o filtro dos relatórios.
+     *
+     * O médico é gravado na prescrição (nome vindo do Feegow), então a lista é
+     * a mesma em todos os relatórios — como as listas de clínicas e medicamentos.
+     *
+     * @return Collection<int, string>
+     */
+    private function medicos(): Collection
+    {
+        return Prescricao::query()
+            ->whereNotNull('medico_nome')
+            ->where('medico_nome', '<>', '')
+            ->distinct()
+            ->orderBy('medico_nome')
+            ->pluck('medico_nome');
     }
 }

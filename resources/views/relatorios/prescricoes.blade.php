@@ -11,6 +11,7 @@
     <x-slot:filtros>
       @include('relatorios.partials.filtros', [
         'rota' => route('relatorios.prescricoes'),
+        'comMedico' => true,
         'rotuloPeriodo' => 'Cadastro de',
       ])
     </x-slot:filtros>
@@ -54,6 +55,7 @@
               <th style="width: 70px;">Nº</th>
               <th style="width: 110px;">Cadastro</th>
               <th style="min-width: 180px;">Paciente</th>
+              <th style="min-width: 160px;">Médico</th>
               <th style="width: 140px;">Clínica</th>
               <th style="width: 150px;">Situação</th>
               <th style="width: 120px;" class="text-end">Bruto</th>
@@ -73,6 +75,7 @@
                 </td>
                 <td>{{ $prescricao->created_at?->format('d/m/Y') ?? '—' }}</td>
                 <td>{{ $prescricao->paciente?->nome ?? '—' }}</td>
+                <td>{{ $prescricao->medico_nome ?? '—' }}</td>
                 <td>{{ $prescricao->clinica?->nome ?? '—' }}</td>
                 <td>
                   <span class="badge {{ $prescricao->situacao_cor }}">{{ $prescricao->situacao }}</span>
@@ -93,7 +96,7 @@
           </tbody>
           <tfoot>
             <tr>
-              <th colspan="5" class="text-end">Total</th>
+              <th colspan="6" class="text-end">Total</th>
               <th class="text-end">R$ {{ number_format($totais['bruto'], 2, ',', '.') }}</th>
               <th class="text-end">R$ {{ number_format($totais['desconto'], 2, ',', '.') }}</th>
               <th class="text-end">R$ {{ number_format($totais['adicional'], 2, ',', '.') }}</th>

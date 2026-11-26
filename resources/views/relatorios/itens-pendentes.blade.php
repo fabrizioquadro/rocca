@@ -11,6 +11,7 @@
     <x-slot:filtros>
       @include('relatorios.partials.filtros', [
         'rota' => route('relatorios.itens-pendentes'),
+        'comMedico' => true,
         'comMedicamento' => true,
         'rotuloPeriodo' => 'Data prevista de',
       ])
@@ -51,6 +52,7 @@
               <th style="width: 115px;">Data prevista</th>
               <th style="width: 90px;">Semana</th>
               <th style="min-width: 170px;">Paciente</th>
+              <th style="min-width: 160px;">Médico</th>
               <th style="width: 140px;">Clínica</th>
               <th style="min-width: 200px;">Medicamento</th>
               <th style="width: 110px;" class="text-end">Quantidade</th>
@@ -72,6 +74,7 @@
                 </td>
                 <td>{{ $item->semana?->numero ?? '—' }}</td>
                 <td>{{ $item->semana?->prescricao?->paciente?->nome ?? '—' }}</td>
+                <td>{{ $item->semana?->prescricao?->medico_nome ?? '—' }}</td>
                 <td>{{ $item->semana?->prescricao?->clinica?->nome ?? '—' }}</td>
                 <td class="fw-semibold">
                   {{ $item->nome }}

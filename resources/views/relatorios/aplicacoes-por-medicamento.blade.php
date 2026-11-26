@@ -9,7 +9,10 @@
     tabela="Resumo por medicamento ({{ $linhas->count() }})"
     legenda="{{ $inicio->format('d/m/Y') }} a {{ $fim->format('d/m/Y') }}">
     <x-slot:filtros>
-      @include('relatorios.partials.filtros', ['rota' => route('relatorios.aplicacoes-por-medicamento')])
+      @include('relatorios.partials.filtros', [
+        'rota' => route('relatorios.aplicacoes-por-medicamento'),
+        'comMedico' => true,
+      ])
     </x-slot:filtros>
 
     <x-slot:resumo>

@@ -1,7 +1,7 @@
 {{--
   Filtros padrão dos relatórios.
   Variáveis: $rota (obrigatória), $comPeriodo, $comClinica, $comMedicamento,
-  $comTipo, $comVencidas, $comMedico, $comFormaPagamento, $comAtendimento,
+  $comTipo, $comVencidas, $comMedico, $medicos, $comFormaPagamento, $comAtendimento,
   $comPaciente, $comSemana, $rotuloPeriodo.
 --}}
 <form method="GET" action="{{ $rota }}" class="relatorio-filtros row g-3 align-items-end">

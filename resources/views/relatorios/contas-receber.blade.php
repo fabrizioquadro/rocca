@@ -11,6 +11,7 @@
     <x-slot:filtros>
       @include('relatorios.partials.filtros', [
         'rota' => route('relatorios.contas-receber'),
+        'comMedico' => true,
         'comVencidas' => true,
         'rotuloPeriodo' => 'Vencimento de',
       ])
@@ -49,6 +50,7 @@
               <th style="width: 110px;">Vencimento</th>
               <th style="width: 90px;">Situação</th>
               <th style="min-width: 180px;">Paciente</th>
+              <th style="min-width: 160px;">Médico</th>
               <th style="width: 140px;">Clínica</th>
               <th style="width: 90px;">Prescrição</th>
               <th style="width: 90px;">Parcela</th>
@@ -73,6 +75,7 @@
                   </span>
                 </td>
                 <td>{{ $parcela->semana?->prescricao?->paciente?->nome ?? '—' }}</td>
+                <td>{{ $parcela->semana?->prescricao?->medico_nome ?? '—' }}</td>
                 <td>{{ $parcela->semana?->prescricao?->clinica?->nome ?? $parcela->financeiro?->clinica?->nome ?? '—' }}</td>
                 <td>#{{ $parcela->financeiro?->prescricao_id ?? '—' }}</td>
                 <td>{{ $parcela->numero_formatado }}</td>
@@ -90,12 +93,12 @@
           </tbody>
           <tfoot>
             <tr>
-              <th colspan="9" class="text-end">Total em aberto</th>
+              <th colspan="10" class="text-end">Total em aberto</th>
               <th class="text-end">R$ {{ number_format($totalAberto, 2, ',', '.') }}</th>
               <th></th>
             </tr>
             <tr>
-              <th colspan="9" class="text-end">Do total, vencido</th>
+              <th colspan="10" class="text-end">Do total, vencido</th>
               <th class="text-end text-danger">R$ {{ number_format($totalVencido, 2, ',', '.') }}</th>
               <th></th>
             </tr>

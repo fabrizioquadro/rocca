@@ -18,6 +18,7 @@
     <x-slot:filtros>
       @include('relatorios.partials.filtros', [
         'rota' => route('relatorios.aplicacoes'),
+        'comMedico' => true,
         'comMedicamento' => true,
         'comSemana' => true,
       ])
@@ -53,6 +54,7 @@
             <tr>
               <th style="width: 135px;">Aplicação</th>
               <th style="min-width: 170px;">Paciente</th>
+              <th style="min-width: 160px;">Médico</th>
               <th style="width: 110px;">Prescrição</th>
               <th style="min-width: 170px;">Medicamento</th>
               <th style="width: 100px;">Quantidade</th>
@@ -68,6 +70,7 @@
               <tr>
                 <td>{{ $aplicacao->aplicado_em_formatado ?? '—' }}</td>
                 <td>{{ $aplicacao->item?->semana?->prescricao?->paciente?->nome ?? '—' }}</td>
+                <td>{{ $aplicacao->item?->semana?->prescricao?->medico_nome ?? '—' }}</td>
                 <td>
                   #{{ $aplicacao->item?->semana?->prescricao_id ?? '—' }}
                   <small class="text-muted d-block">semana {{ $aplicacao->item?->semana?->numero ?? '—' }}</small>
