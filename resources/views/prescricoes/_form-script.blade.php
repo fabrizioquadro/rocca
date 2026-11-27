@@ -930,15 +930,16 @@
       return encontrada;
     };
 
-    // Remove as linhas ainda sem item (a semana nasce com uma linha em branco)
-    const removerLinhasVazias = (semana) => {
-      semana.querySelectorAll('tbody[data-itens-semana] tr').forEach((linha) => {
-        const medicamento = linha.querySelector('[data-select-medicamento]')?.value || '';
-        const combo = linha.querySelector('[data-select-combo]')?.value || '';
-        const quantidade = linha.querySelector('input[name$="[quantidade]"]')?.value || '';
+    // A semana já tem alguma linha preenchida (medicamento, combo ou quantidade)?
+    const semanaTemItens = (semana) => Array.from(semana.querySelectorAll('tbody[data-itens-semana] tr'))
+      .some((linha) => (linha.querySelector('[data-select-medicamento]')?.value || '')
+        || (linha.querySelector('[data-select-combo]')?.value || '')
+        || (linha.querySelector('input[name$="[quantidade]"]')?.value || ''));
 
-        if (!medicamento && !combo && !quantidade) linha.remove();
-      });
+    // Esvazia os itens da semana: o gerador regrava a lista inteira e anexar
+    // os itens novos aos antigos duplicava medicamentos
+    const removerTodosOsItens = (semana) => {
+      semana.querySelectorAll('tbody[data-itens-semana] tr').forEach((linha) => linha.remove());
     };
 
     // Remove as semanas totalmente vazias (a tela sempre nasce com uma em branco)
@@ -1038,8 +1039,31 @@
 
       removerSemanasVazias();
 
+      // Semana que já está na tela com medicamentos: os itens do gerador
+      // SUBSTITUEM os antigos (antes eles eram anexados, o que duplicava os
+      // itens e dobrava o valor da semana)
+      const semanasComItens = [];
+
       for (let i = 0; i < numeroSemanas; i++) {
-        const dataSemana = dataParaCampoData(data);
+        const semana = semanaComData(dataParaCampoData(data));
+
+        if (semana && semanaTemItens(semana)) {
+          semanasComItens.push(semana);
+        }
+
+        data.setDate(data.getDate() + intervalo);
+      }
+
+      if (semanasComItens.length && !window.confirm(
+        semanasComItens.length + ' semana(s) já têm medicamentos lançados e vão ser substituídas pelos itens do gerador. Continuar?'
+      )) {
+        return;
+      }
+
+      const cursor = dataDoCampo(dataInicio);
+
+      for (let i = 0; i < numeroSemanas; i++) {
+        const dataSemana = dataParaCampoData(cursor);
         const semana = semanaComData(dataSemana);
 
         if (semana) {
@@ -1052,13 +1076,13 @@
             aplicarSemAplicacao(semana);
           }
 
-          removerLinhasVazias(semana);
+          removerTodosOsItens(semana);
           itens.forEach((item) => adicionarItem(semana, item));
         } else {
           adicionarSemana({ data_prevista: dataSemana, itens: itens });
         }
 
-        data.setDate(data.getDate() + intervalo);
+        cursor.setDate(cursor.getDate() + intervalo);
       }
 
       // Completa os buracos entre as semanas com semanas de pausa

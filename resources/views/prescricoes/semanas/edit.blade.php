@@ -233,8 +233,24 @@
         atualizarTotais();
       };
 
-      // Escolheu um medicamento/combo: o valor volta a ser o do cadastro
+      // Assinatura do medicamento/combo escolhido (tipo + id)
+      const chaveDaSelecao = (linha) => {
+        const ehCombo = linha.querySelector('[data-tipo-item]').value === 'combo';
+        const select = linha.querySelector(ehCombo ? '[data-select-combo]' : '[data-select-medicamento]');
+
+        return (ehCombo ? 'combo:' : 'medicamento:') + (select && select.value ? select.value : '');
+      };
+
+      // Escolheu um medicamento/combo DIFERENTE do que estava: o valor entra
+      // pelo cadastro. Re-selecionar o mesmo item não mexe no valor — era isso
+      // que fazia o preço negociado voltar para o de tabela.
       const aplicarValorDoCadastro = (linha) => {
+        const chave = chaveDaSelecao(linha);
+
+        if (linha.dataset.selecao === chave) return;
+
+        linha.dataset.selecao = chave;
+
         const ehCombo = linha.querySelector('[data-tipo-item]').value === 'combo';
         const select = linha.querySelector(ehCombo ? '[data-select-combo]' : '[data-select-medicamento]');
         const valor = valorDaOpcao(select);
@@ -248,6 +264,8 @@
         const selectCombo = linha.querySelector('[data-select-combo]');
         const campoQtd = linha.querySelector('[data-qtd-item]');
         const campoValor = linha.querySelector('[data-valor-item]');
+
+        linha.dataset.selecao = chaveDaSelecao(linha);
 
         // Trocar tipo/medicamento/combo recarrega o valor do cadastro;
         // quantidade e valor digitados apenas recalculam o total.

@@ -120,7 +120,10 @@ class PrescricaoEdicaoService
             $semAplicacao = (bool) ($linha['sem_aplicacao'] ?? false);
             $preparados = $semAplicacao
                 ? ['itens' => [], 'exige_anexo' => false]
-                : $this->semanas->prepararItens($linha['itens'] ?? []);
+                : $this->semanas->prepararItens(
+                    $linha['itens'] ?? [],
+                    $this->semanas->valoresAnteriores($semana?->itens)
+                );
 
             $itens = $preparados['itens'];
             $exigeAnexo = $exigeAnexo || $preparados['exige_anexo'];

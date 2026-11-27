@@ -157,10 +157,15 @@ class PrescricaoSemanaController extends Controller
 
             $semAplicacao = (bool) ($dados['sem_aplicacao'] ?? false);
 
+            $semana->loadMissing('itens');
+
             // Semana sem aplicação não leva medicamentos
             $itens = $semAplicacao
                 ? []
-                : $this->semanas->prepararItens($dados['itens'] ?? [])['itens'];
+                : $this->semanas->prepararItens(
+                    $dados['itens'] ?? [],
+                    $this->semanas->valoresAnteriores($semana->itens)
+                )['itens'];
 
             if (! $semAplicacao && count($itens) === 0) {
                 throw ValidationException::withMessages([

@@ -43,14 +43,16 @@ class PrescricaoSemanaService
 
     /**
      * Normaliza os itens vindos do formulário. O valor pode vir informado na
-     * tela (alterado pelo usuário); sem ele, usa o do cadastro (medicamento:
-     * valor de venda / combo: soma dos itens). Devolve também se algum item
-     * exige anexo (prescrição médica).
+     * tela (alterado pelo usuário); sem ele, reaproveita o valor que a semana
+     * já tinha para aquele medicamento/combo e, por último, o do cadastro
+     * (medicamento: valor de venda / combo: soma dos itens). Devolve também se
+     * algum item exige anexo (prescrição médica).
      *
      * @param  array<int, array<string, mixed>>  $itens
+     * @param  array<string, float>  $valoresAnteriores  valor atual por item (ver valoresAnteriores())
      * @return array{itens: array<int, array<string, mixed>>, exige_anexo: bool}
      */
-    public function prepararItens(array $itens): array
+    public function prepararItens(array $itens, array $valoresAnteriores = []): array
     {
         $preparados = [];
         $exigeAnexo = false;
@@ -85,7 +87,10 @@ class PrescricaoSemanaService
                     'medicamento_id' => null,
                     'combo_id' => $combo->id,
                     'quantidade' => $quantidade,
-                    'valor' => $this->valorDoItem($item['valor'] ?? null, (float) $combo->valor_total),
+                    'valor' => $this->valorDoItem(
+                        $item['valor'] ?? null,
+                        $valoresAnteriores['combo:'.$combo->id] ?? (float) $combo->valor_total
+                    ),
                     'gera_aplicacao' => $geraAplicacao,
                     'status' => $geraAplicacao ? StatusSemanaItem::Aberto : StatusSemanaItem::Aplicado,
                 ];
@@ -110,13 +115,40 @@ class PrescricaoSemanaService
                 'medicamento_id' => $medicamento->id,
                 'combo_id' => null,
                 'quantidade' => $quantidade,
-                'valor' => $this->valorDoItem($item['valor'] ?? null, (float) $medicamento->valor_venda),
+                'valor' => $this->valorDoItem(
+                    $item['valor'] ?? null,
+                    $valoresAnteriores['medicamento:'.$medicamento->id] ?? (float) $medicamento->valor_venda
+                ),
                 'gera_aplicacao' => $geraAplicacao,
                 'status' => $geraAplicacao ? StatusSemanaItem::Aberto : StatusSemanaItem::Aplicado,
             ];
         }
 
         return ['itens' => $preparados, 'exige_anexo' => $exigeAnexo];
+    }
+
+    /**
+     * Valor que a semana já tem hoje por medicamento/combo ("medicamento:12"
+     * => 290.0), usado quando o formulário não devolve o valor do item: assim o
+     * preço negociado não volta para o de tabela. Item repetido na semana com
+     * valores diferentes fica de fora (não há como saber qual é o certo).
+     *
+     * @param  iterable<int, PrescricaoSemanaItem>|\Illuminate\Support\Collection<int, PrescricaoSemanaItem>|null  $itens
+     * @return array<string, float>
+     */
+    public function valoresAnteriores($itens): array
+    {
+        if ($itens === null) {
+            return [];
+        }
+
+        return collect($itens)
+            ->groupBy(fn (PrescricaoSemanaItem $item) => ($item->tipo === 'combo' ? 'combo:' : 'medicamento:')
+                .($item->tipo === 'combo' ? $item->combo_id : $item->medicamento_id))
+            ->map(fn ($grupo) => $grupo->pluck('valor')->map(fn ($valor) => (float) $valor)->unique())
+            ->filter(fn ($valores) => $valores->count() === 1)
+            ->map(fn ($valores) => (float) $valores->first())
+            ->all();
     }
 
     /**

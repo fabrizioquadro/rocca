@@ -251,13 +251,40 @@ class PrescricaoController extends Controller
             ->all();
 
         return [
-            'semanas' => $semanasDoFormulario ?? old('semanas', $semanas),
+            'semanas' => $this->semanasParaTela($semanasDoFormulario ?? old('semanas'), $semanas),
             'estado' => $estado,
             'medicamentos' => Medicamento::orderBy('nome')->get(),
             'combos' => Combo::with('itens.medicamento')->orderBy('nome')->get(),
             'financeiro' => $this->edicao->resumoFinanceiro($prescricao),
             'resumoAlteracoes' => null,
         ];
+    }
+
+    /**
+     * Semanas como a tela espera (lista, com os itens também em lista).
+     *
+     * Vindas do formulário, as semanas e os itens chegam com as chaves do
+     * formulário (`semanas[1968][itens][i1]`): no JSON isso vira objeto e a
+     * tela de conferência abria todas as semanas sem item nenhum. Por isso as
+     * chaves são descartadas aqui — a tela identifica a semana pelo campo `id`.
+     *
+     * @param  array<int|string, mixed>|null  $doFormulario
+     * @param  array<int, array<string, mixed>>  $doBanco
+     * @return array<int, array<string, mixed>>
+     */
+    private function semanasParaTela(?array $doFormulario, array $doBanco): array
+    {
+        if ($doFormulario === null) {
+            return $doBanco;
+        }
+
+        return collect($doFormulario)
+            ->filter(fn ($semana) => is_array($semana))
+            ->map(fn (array $semana) => array_merge($semana, [
+                'itens' => array_values(is_array($semana['itens'] ?? null) ? $semana['itens'] : []),
+            ]))
+            ->values()
+            ->all();
     }
 
     /**

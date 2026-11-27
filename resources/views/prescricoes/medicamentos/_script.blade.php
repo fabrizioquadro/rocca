@@ -152,13 +152,29 @@
       if (comSelect2) inicializarSelect2(linha);
     };
 
+    // Assinatura do medicamento/combo escolhido na linha (tipo + id)
+    const chaveDaSelecao = (linha) => {
+      const tipo = linha.querySelector('[data-tipo-item]')?.value === 'combo' ? 'combo' : 'medicamento';
+      const select = linha.querySelector(tipo === 'combo' ? '[data-select-combo]' : '[data-select-medicamento]');
+
+      return tipo + ':' + (select && select.value ? select.value : '');
+    };
+
     // O valor do item vem do cadastro (medicamento: valor de venda / combo:
-    // soma dos itens) e vai sendo preenchido conforme a escolha
+    // soma dos itens) quando o usuário escolhe OUTRO medicamento/combo.
+    // Re-selecionar o mesmo item não mexe no valor: era isso que fazia o preço
+    // negociado voltar para o de tabela ao editar a prescrição.
     const aplicarValorDoItem = (linha) => {
       const campoValor = linha.querySelector('[data-valor]');
       const select = selectDoItem(linha);
 
       if (!campoValor || !select) return;
+
+      const chave = chaveDaSelecao(linha);
+
+      if (linha.dataset.selecao === chave) return;
+
+      linha.dataset.selecao = chave;
 
       const opcao = select.options[select.selectedIndex];
       const valor = opcao && opcao.value ? opcao.getAttribute('data-valor') : '';
@@ -194,6 +210,10 @@
       } else {
         linha.querySelector('[data-select-medicamento]').value = item.medicamento_id ?? '';
       }
+
+      // Guarda o medicamento/combo que veio da prescrição: só uma troca
+      // diferente desta aplica o valor do cadastro
+      linha.dataset.selecao = chaveDaSelecao(linha);
 
       aplicarTipo(linha, !bloqueada);
       atualizarTotais();
